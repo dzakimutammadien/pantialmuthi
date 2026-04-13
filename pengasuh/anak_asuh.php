@@ -201,14 +201,73 @@ unset($_SESSION['success'], $_SESSION['error']);
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
-        .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; }
-        .sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; justify-content: center; }
-        .sidebar-logo { width: 45px; height: 45px; object-fit: contain; }
-        .sidebar-header h3 { font-size: 16px; }
-        .sidebar-menu { padding: 20px 0; }
-        .menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.8); transition: all 0.3s; }
-        .menu-item:hover, .menu-item.active { background: rgba(80,200,120,0.3); border-left: 4px solid #50c878; }
-        .menu-item i { width: 24px; }
+       .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100%;
+            background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%);
+            color: white;
+            transition: all 0.3s ease;
+            z-index: 100;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .sidebar-logo {
+            width: 45px;
+            height: 45px;
+            object-fit: contain;
+        }
+        
+        .sidebar-header h3 {
+            font-size: 16px;
+            margin-bottom: 3px;
+        }
+        
+        .sidebar-header p {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .sidebar-menu {
+            padding: 20px 0;
+        }
+        
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255,255,255,0.8);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .menu-item:hover, .menu-item.active {
+            background: rgba(80,200,120,0.3);
+            color: white;
+            border-left: 4px solid #50c878;
+        }
+        
+        .menu-item i {
+            width: 24px;
+            font-size: 18px;
+        }
+        
+        .menu-item span {
+            font-size: 14px;
+        }
         .main-content { margin-left: 280px; padding: 20px; }
         .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
         .page-title h2 { font-size: 20px; color: #333; }
