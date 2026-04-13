@@ -514,7 +514,7 @@ $recentDonasi = query($queryRecent);
                     <i class="fas fa-hand-holding-heart"></i>
                     <span>Donasi Donatur</span>
                 </div>
-                <div class="submenu-item" onclick="location.href='pengeluaran_panti.php'">
+                <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'">
                     <i class="fas fa-money-bill-wave"></i>
                     <span>Pengeluaran Panti</span>
                 </div>

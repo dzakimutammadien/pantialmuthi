@@ -643,7 +643,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                     <i class="fas fa-hand-holding-heart"></i>
                     <span>Donasi Donatur</span>
                 </div>
-                <div class="submenu-item" onclick="location.href='pengeluaran_panti.php'">
+                <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'">
                     <i class="fas fa-money-bill-wave"></i>
                     <span>Pengeluaran Panti</span>
                 </div>
@@ -652,29 +652,30 @@ unset($_SESSION['success'], $_SESSION['error']);
                     <span>Laporan Keuangan</span>
                 </div>
             </div>
-            <div class="menu-item has-submenu open">
-                <i class="fas fa-database"></i>
-                <span>Master Data</span>
-                <i class="fas fa-chevron-down arrow"></i>
-            </div>
-            <div class="submenu open">
-                <div class="submenu-item active" onclick="location.href='kategori_donasi.php'">
-                    <i class="fas fa-tags"></i>
-                    <span>Kategori Transaksi</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='kategori_role.php'">
-                    <i class="fas fa-user-tag"></i>
-                    <span>Kategori Role</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='anak_asuh.php'">
-                    <i class="fas fa-child"></i>
-                    <span>Data Anak Asuh</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='doa_khusus.php'">
-                    <i class="fas fa-pray"></i>
-                    <span>Data Doa Khusus</span>
-                </div>
-            </div>
+            <!-- Master Data: ada class "open" → selalu terbuka saat load -->
+<div class="menu-item has-submenu open" onclick="toggleSubmenu(this)">
+    <i class="fas fa-database"></i>
+    <span>Master Data</span>
+    <i class="fas fa-chevron-down arrow"></i>
+</div>
+<div class="submenu open">
+    <div class="submenu-item" onclick="location.href='kategori_donasi.php'">
+        <i class="fas fa-tags"></i>
+        <span>Kategori Transaksi</span>
+    </div>
+    <div class="submenu-item active" onclick="location.href='kategori_role.php'">
+        <i class="fas fa-user-tag"></i>
+        <span>Kategori Role</span>
+    </div>
+    <div class="submenu-item" onclick="location.href='anak_asuh.php'">
+        <i class="fas fa-child"></i>
+        <span>Data Anak Asuh</span>
+    </div>
+    <div class="submenu-item" onclick="location.href='doa_khusus.php'">
+        <i class="fas fa-pray"></i>
+        <span>Data Doa Khusus</span>
+    </div>
+</div>
         </div>
     </div>
     
