@@ -126,7 +126,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         }
         
         /* SIDEBAR STYLES */
-        .sidebar {
+         .sidebar {
             position: fixed;
             left: 0;
             top: 0;
@@ -172,7 +172,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         .menu-item {
             padding: 12px 20px;
             display: flex;
-            align-items: center;
+-align-items: center;
             gap: 12px;
             color: rgba(255,255,255,0.8);
             transition: all 0.3s ease;
@@ -627,7 +627,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         <div class="sidebar-menu">
             <div class="menu-item" onclick="location.href='dashboard.php'">
                 <i class="fas fa-tachometer-alt"></i>
-                <span>Beranda</span>
+                <span>Dashboard</span>
             </div>
             <div class="menu-item" onclick="location.href='users.php'">
                 <i class="fas fa-users"></i>
