@@ -545,7 +545,7 @@ unset($_SESSION['success'], $_SESSION['error']);
     <i class="fas fa-chevron-down arrow"></i>
 </div>
 <div class="submenu">
-    <div class="submenu-item" onclick="location.href='donasi_donatur.php'">
+    <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'">
         <i class="fas fa-hand-holding-heart"></i>
         <span>Donasi Donatur</span>
     </div>

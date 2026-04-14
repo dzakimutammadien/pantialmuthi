@@ -54,10 +54,7 @@ if ($search != '') {
 }
 if ($filter_status != '' && $filter_status != 'semua') {
     $where .= " AND d.status = '$filter_status'";
-} else {
-    // Default tampilkan pending dulu
-    $where .= " AND d.status = 'pending'";
-}
+} 
 if ($filter_kategori != '' && $filter_kategori > 0) {
     $where .= " AND d.kategori_id = $filter_kategori";
 }
