@@ -1,72 +1,30 @@
 <?php
 // ======================================================
-// FILE: pengasuh/doa.php
-// HALAMAN PERMOHONAN KHUSUS DO'A UNTUK PENGASUH
+// FILE: admin/doa_khusus.php
+// HALAMAN DATA DOA KHUSUS UNTUK ADMIN (READ ONLY)
 // ======================================================
 
 require_once '../config/database.php';
 require_once '../config/session.php';
 require_once '../config/rbac.php';
 
-requireRole('pengasuh');
+requireRole('admin');
 requirePermission('doa.view');
 
 $currentUser = getCurrentUser();
 
 // ======================================================
-// PROSES VERIFIKASI DOA
-// ======================================================
-if (isset($_POST['verifikasi'])) {
-    $id = (int)$_POST['id'];
-    $status = mysqli_real_escape_string($conn, $_POST['status']);
-    $catatan = mysqli_real_escape_string($conn, $_POST['catatan']);
-    $dibaca_oleh = $currentUser['id'];
-    $dibaca_at = date('Y-m-d H:i:s');
-    
-    // Upload bukti foto jika status jadi didoakan
-    $bukti_foto = null;
-    if ($status == 'didoakan' && isset($_FILES['bukti_foto']) && $_FILES['bukti_foto']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($_FILES['bukti_foto']['name'], PATHINFO_EXTENSION);
-        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $filename = 'doa_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
-            $target = '../assets/uploads/doa/' . $filename;
-            if (move_uploaded_file($_FILES['bukti_foto']['tmp_name'], $target)) {
-                $bukti_foto = $filename;
-            }
-        }
-    }
-    
-    // Update query
-    $sql = "UPDATE doa SET 
-            status_doa = '$status', 
-            dibaca_oleh = $dibaca_oleh, 
-            dibaca_at = '$dibaca_at',
-            keterangan = '$catatan'";
-    if ($bukti_foto) {
-        $sql .= ", bukti_foto = '$bukti_foto'";
-    }
-    $sql .= " WHERE id = $id";
-    
-    if (mysqli_query($conn, $sql)) {
-        logActivity($currentUser['id'], "Verifikasi doa ID: $id => $status");
-        $_SESSION['success'] = "Doa berhasil diverifikasi!";
-    } else {
-        $_SESSION['error'] = "Gagal verifikasi: " . mysqli_error($conn);
-    }
-    header("Location: doa.php");
-    exit();
-}
-
-// ======================================================
 // FILTER & PAGINATION
 // ======================================================
+$search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
 $filter_status = isset($_GET['status']) ? mysqli_real_escape_string($conn, $_GET['status']) : '';
 $filter_periode = isset($_GET['periode']) ? mysqli_real_escape_string($conn, $_GET['periode']) : '';
 
 $where = "WHERE 1=1";
 
+if ($search != '') {
+    $where .= " AND (d.catatan_doa LIKE '%$search%' OR donatur.nama_lengkap LIKE '%$search%' OR donatur.username LIKE '%$search%' OR pengasuh.nama_lengkap LIKE '%$search%')";
+}
 if ($filter_status != '' && $filter_status != 'semua') {
     $where .= " AND d.status_doa = '$filter_status'";
 }
@@ -87,6 +45,7 @@ $offset = ($page - 1) * $limit;
 
 $total_sql = "SELECT COUNT(*) as total FROM doa d 
               JOIN users donatur ON d.user_id = donatur.id 
+              LEFT JOIN users pengasuh ON d.dibaca_oleh = pengasuh.id 
               $where";
 $total_result = mysqli_query($conn, $total_sql);
 $total_rows = mysqli_fetch_assoc($total_result)['total'];
@@ -95,14 +54,16 @@ $total_pages = ceil($total_rows / $limit);
 $sql = "SELECT d.*, 
         donatur.nama_lengkap as donatur_nama, 
         donatur.username as donatur_username,
+        pengasuh.nama_lengkap as pengasuh_nama,
         CASE 
             WHEN d.donasi_id IS NULL THEN 'Titip Doa Manual'
             ELSE CONCAT('Donasi ID: ', d.donasi_id)
         END as sumber
         FROM doa d 
         JOIN users donatur ON d.user_id = donatur.id 
+        LEFT JOIN users pengasuh ON d.dibaca_oleh = pengasuh.id 
         $where 
-        ORDER BY d.created_at ASC 
+        ORDER BY d.created_at DESC 
         LIMIT $offset, $limit";
 $doaList = query($sql);
 
@@ -116,7 +77,7 @@ unset($_SESSION['success'], $_SESSION['error']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Permohonan Khusus Do'a - Pengasuh Panti Asuhan Al-Muthi</title>
+    <title>Data Doa Khusus - Admin Panti Asuhan Al-Muthi</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -133,6 +94,12 @@ unset($_SESSION['success'], $_SESSION['error']);
         .menu-item:hover, .menu-item.active { background: rgba(80,200,120,0.3); border-left: 4px solid #50c878; }
         .menu-item i { width: 24px; font-size: 18px; }
         .menu-item span { font-size: 14px; }
+        .submenu { padding-left: 56px; max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+        .submenu.open { max-height: 300px; }
+        .submenu-item { padding: 10px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.7); font-size: 13px; }
+        .submenu-item:hover { color: #50c878; padding-left: 25px; }
+        .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
+        .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
         
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
         
@@ -148,7 +115,9 @@ unset($_SESSION['success'], $_SESSION['error']);
         
         .content-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; background: white; }
+        .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; }
+        .filter-section input { flex: 2; }
+        .filter-section select { flex: 1; }
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
         .btn-filter { background: #50c878; color: white; }
         .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
@@ -167,7 +136,6 @@ unset($_SESSION['success'], $_SESSION['error']);
         
         .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; display: inline-block; white-space: nowrap; }
         .btn-detail { background: #17a2b8; color: white; }
-        .btn-verifikasi { background: #ffc107; color: #333; }
         
         .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
         .pagination a, .pagination span { padding: 8px 14px; border-radius: 8px; text-decoration: none; }
@@ -184,24 +152,13 @@ unset($_SESSION['success'], $_SESSION['error']);
         .detail-value { font-size: 14px; color: #333; }
         .detail-image { text-align: center; margin: 15px 0; }
         .detail-image img { max-width: 100%; max-height: 200px; border-radius: 10px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; }
-        .form-group textarea { width: 100%; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; resize: vertical; }
-        .radio-group { display: flex; gap: 20px; align-items: center; margin: 10px 0; }
-        .radio-group label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-save { background: #50c878; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
-        .btn-cancel { background: #6c757d; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
-        
-        .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
-        .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
-        .alert-error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
+        .modal-footer { display: flex; justify-content: flex-end; margin-top: 20px; }
+        .btn-cancel { background: #6c757d; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; }
         
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">
             <img src="../assets/image/almuthi.png" alt="Logo Al-Muthi" class="sidebar-logo" onerror="this.style.display='none'">
@@ -209,23 +166,34 @@ unset($_SESSION['success'], $_SESSION['error']);
         </div>
         <div class="sidebar-menu">
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Beranda</span></div>
-            <div class="menu-item" onclick="location.href='pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-            <div class="menu-item active" onclick="location.href='doa.php'"><i class="fas fa-pray"></i><span>Permohonan Khusus Do'a</span></div>
-            <div class="menu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
-            <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
+            <div class="menu-item" onclick="location.href='users.php'"><i class="fas fa-users"></i><span>Manajemen User</span></div>
+            <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-exchange-alt"></i><span>Transaksi</span><i class="fas fa-chevron-down arrow"></i></div>
+            <div class="submenu">
+                <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
+                <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+                <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+            </div>
+            <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
+            <div class="submenu open">
+                <div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div>
+                <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
+                <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
+                <div class="submenu-item active" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
+            </div>
         </div>
     </div>
     
     <div class="main-content">
         <div class="topbar">
             <div class="page-title">
-                <h2>Permohonan Khusus Do'a</h2>
-                <p>Doa dan permohonan dari donatur</p>
+                <h2>Data Doa Khusus</h2>
+                <p>Semua doa dan permohonan dari donatur</p>
             </div>
             <div class="profile-dropdown">
                 <div class="profile-icon"><i class="fas fa-cog"></i></div>
                 <div class="dropdown-menu">
                     <a href="profil.php"><i class="fas fa-user-circle"></i> Profil</a>
+                    <a href="log_aktivitas.php"><i class="fas fa-history"></i> Log Aktivitas</a>
                     <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
             </div>
@@ -239,8 +207,8 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="alert alert-error"><?php echo $error; ?></div>
             <?php endif; ?>
             
-            <!-- FILTER -->
             <form method="GET" action="" class="filter-section">
+                <input type="text" name="search" placeholder="Cari doa, donatur, atau pengasuh..." value="<?php echo htmlspecialchars($search); ?>">
                 <select name="periode">
                     <option value="semua">Semua Periode</option>
                     <option value="minggu_ini" <?php echo $filter_periode == 'minggu_ini' ? 'selected' : ''; ?>>Minggu Ini</option>
@@ -250,13 +218,14 @@ unset($_SESSION['success'], $_SESSION['error']);
                     <option value="semua">Semua Status</option>
                     <option value="pending" <?php echo $filter_status == 'pending' ? 'selected' : ''; ?>>Menunggu</option>
                     <option value="dibaca" <?php echo $filter_status == 'dibaca' ? 'selected' : ''; ?>>Telah Dibaca</option>
+                    <option value="didoakan" <?php echo $filter_status == 'didoakan' ? 'selected' : ''; ?>>Terlaksana</option>
                 </select>
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Filter</button>
-                <a href="doa.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
+                <a href="doa_khusus.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
             </form>
             
-            <!-- TABLE -->
             <div class="table-wrapper">
+                <h4 style="margin-bottom: 15px;"><i class="fas fa-list"></i> Daftar Doa Khusus</h4>
                 <table>
                     <thead>
                         <tr>
@@ -266,6 +235,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <th>Sumber</th>
                             <th>Isi Doa</th>
                             <th>Status</th>
+                            <th>Pengasuh</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
@@ -290,48 +260,45 @@ unset($_SESSION['success'], $_SESSION['error']);
                                 <td><?php echo date('d/m/Y H:i', strtotime($doa['created_at'])); ?></td>
                                 <td><?php echo htmlspecialchars($doa['donatur_nama']); ?><br><small><?php echo $doa['donatur_username']; ?></small></td>
                                 <td><?php echo $doa['sumber']; ?></td>
-                                <td><?php echo nl2br(htmlspecialchars(substr($doa['catatan_doa'], 0, 80))) . (strlen($doa['catatan_doa']) > 80 ? '...' : ''); ?></td>
+                                <td><?php echo nl2br(htmlspecialchars(substr($doa['catatan_doa'], 0, 50))) . (strlen($doa['catatan_doa']) > 50 ? '...' : ''); ?></td>
                                 <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
+                                <td><?php echo htmlspecialchars($doa['pengasuh_nama'] ?: '-'); ?></td>
                                 <td>
                                     <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $doa['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
-                                    <?php if ($doa['status_doa'] != 'didoakan'): ?>
-                                        <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $doa['id']; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
-                                    <?php endif; ?>
-                                    </td>
+                        </td>
                             </tr
                         <?php endforeach; else: ?>
-                            <tr><td colspan="7" style="text-align:center; padding:40px;">Belum ada permohonan doa</td></tr>
+                            <tr><td colspan="8" style="text-align:center; padding:40px;">Belum ada data doa</td>
+                            </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
             
-            <!-- PAGINATION -->
             <?php if ($total_pages > 1): ?>
             <div class="pagination">
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?php echo $page-1; ?>&periode=<?php echo $filter_periode; ?>&status=<?php echo $filter_status; ?>">« Sebelumnya</a>
+                    <a href="?page=<?php echo $page-1; ?>&search=<?php echo $search; ?>&periode=<?php echo $filter_periode; ?>&status=<?php echo $filter_status; ?>">« Sebelumnya</a>
                 <?php endif; ?>
                 <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                     <?php if ($i == $page): ?>
                         <span class="active"><?php echo $i; ?></span>
                     <?php else: ?>
-                        <a href="?page=<?php echo $i; ?>&periode=<?php echo $filter_periode; ?>&status=<?php echo $filter_status; ?>"><?php echo $i; ?></a>
+                        <a href="?page=<?php echo $i; ?>&search=<?php echo $search; ?>&periode=<?php echo $filter_periode; ?>&status=<?php echo $filter_status; ?>"><?php echo $i; ?></a>
                     <?php endif; ?>
                 <?php endfor; ?>
                 <?php if ($page < $total_pages): ?>
-                    <a href="?page=<?php echo $page+1; ?>&periode=<?php echo $filter_periode; ?>&status=<?php echo $filter_status; ?>">Selanjutnya »</a>
+                    <a href="?page=<?php echo $page+1; ?>&search=<?php echo $search; ?>&periode=<?php echo $filter_periode; ?>&status=<?php echo $filter_status; ?>">Selanjutnya »</a>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
     </div>
     
-    <!-- MODAL DETAIL -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Detail Doa</h3>
+                <h3>Detail Doa Khusus</h3>
                 <span class="close-modal" onclick="closeModal('detailModal')">&times;</span>
             </div>
             <div id="detailContent"></div>
@@ -341,62 +308,21 @@ unset($_SESSION['success'], $_SESSION['error']);
         </div>
     </div>
     
-    <!-- MODAL VERIFIKASI -->
-    <div id="verifikasiModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Verifikasi Doa</h3>
-                <span class="close-modal" onclick="closeModal('verifikasiModal')">&times;</span>
-            </div>
-            <form method="POST" action="" enctype="multipart/form-data">
-                <input type="hidden" name="id" id="verifikasi_id">
-                <div id="verifikasiData"></div>
-                <div class="form-group">
-                    <label>Status</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="status" value="dibaca" required> 📖 Telah Dibaca</label>
-                        <label><input type="radio" name="status" value="didoakan"> 🙏 Telah Didoakan</label>
-                    </div>
-                </div>
-                <div class="form-group" id="bukti_foto_group" style="display: none;">
-                    <label>Upload Bukti Foto Pelaksanaan</label>
-                    <input type="file" name="bukti_foto" accept="image/*">
-                    <small style="color:#888;">Format: JPG, PNG (Max 2MB)</small>
-                </div>
-                <div class="form-group">
-                    <label>Catatan / Keterangan</label>
-                    <textarea name="catatan" rows="3" placeholder="Masukkan catatan (opsional)"></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('verifikasiModal')">Batal</button>
-                    <button type="submit" name="verifikasi" class="btn-save">Kirim</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
     <script>
-        // Tampilkan input upload foto jika pilih "Telah Didoakan"
-        document.addEventListener('DOMContentLoaded', function() {
-            const radioButtons = document.querySelectorAll('input[name="status"]');
-            radioButtons.forEach(radio => {
-                radio.addEventListener('change', function() {
-                    const buktiGroup = document.getElementById('bukti_foto_group');
-                    if (this.value === 'didoakan') {
-                        buktiGroup.style.display = 'block';
-                    } else {
-                        buktiGroup.style.display = 'none';
-                    }
-                });
-            });
-        });
+        function toggleSubmenu(e) {
+            e.classList.toggle('open');
+            let s = e.nextElementSibling;
+            if(s && s.classList.contains('submenu')) {
+                s.classList.toggle('open');
+            }
+        }
         
         function closeModal(modalId) {
             document.getElementById(modalId).classList.remove('show');
         }
         
         function openDetailModal(id) {
-            fetch('get_doa_pengasuh.php?id=' + id)
+            fetch('get_doa_admin.php?id=' + id)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -416,25 +342,11 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <div class="detail-item"><div class="detail-label">Isi Doa</div><div class="detail-value">${d.catatan_doa.replace(/\n/g, '<br>')}</div></div>
                             <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>
                             ${imageHtml}
+                            <div class="detail-item"><div class="detail-label">Dilaksanakan Oleh</div><div class="detail-value">${d.pengasuh_nama || '-'}</div></div>
+                            <div class="detail-item"><div class="detail-label">Tanggal Dilaksanakan</div><div class="detail-value">${d.dibaca_at || '-'}</div></div>
                             <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${d.keterangan || '-'}</div></div>
                         `;
                         document.getElementById('detailModal').classList.add('show');
-                    }
-                });
-        }
-        
-        function openVerifikasiModal(id) {
-            fetch('get_doa_pengasuh.php?id=' + id)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        let d = data.data;
-                        document.getElementById('verifikasi_id').value = d.id;
-                        document.getElementById('verifikasiData').innerHTML = `
-                            <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.donatur_nama}</div></div>
-                            <div class="detail-item"><div class="detail-label">Isi Doa</div><div class="detail-value">${d.catatan_doa}</div></div>
-                        `;
-                        document.getElementById('verifikasiModal').classList.add('show');
                     }
                 });
         }

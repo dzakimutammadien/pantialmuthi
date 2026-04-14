@@ -17,14 +17,20 @@ $permissions = [
         'verifikasi_pengeluaran.view', 'verifikasi_pengeluaran.approve', 'verifikasi_pengeluaran.reject',
         // Laporan & Log
         'laporan.view', 'log_aktivitas.view',
+        // Doa
+        'doa.view',  // <-- TAMBAHKAN INI
+        // Anak Asuh
+        'anak_asuh.view',
         // Profil
-        'profil.edit'
+        'profil.edit',
+        'laporan.view', 'laporan.export'
+        
     ],
     
     'pengasuh' => [
         // Anak asuh
         'anak_asuh.view', 'anak_asuh.create', 'anak_asuh.edit', 'anak_asuh.delete',
-        // Pengeluaran (edit/hapus hanya milik sendiri & status pending)
+        // Pengeluaran
         'pengeluaran.view', 'pengeluaran.create', 'pengeluaran.edit_own', 'pengeluaran.delete_own',
         // Doa
         'doa.view', 'doa.verify',

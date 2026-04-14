@@ -661,20 +661,7 @@ $recentDonasi = query($queryRecent);
             }
         }
         
-        // Untuk memastikan submenu yang aktif tetap terbuka (opsional)
-        // Cek apakah ada menu aktif di submenu
-        document.querySelectorAll('.submenu-item').forEach(item => {
-            if (item.classList.contains('active')) {
-                let parentSubmenu = item.closest('.submenu');
-                if (parentSubmenu) {
-                    parentSubmenu.classList.add('open');
-                    let parentMenu = parentSubmenu.previousElementSibling;
-                    if (parentMenu && parentMenu.classList.contains('has-submenu')) {
-                        parentMenu.classList.add('open');
-                    }
-                }
-            }
-        });
+        
     </script>
 </body>
 </html>
