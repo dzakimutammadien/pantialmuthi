@@ -158,6 +158,20 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
         .btn-filter { background: #50c878; color: white; }
         .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
+        .btn-export-pdf {
+    background: #dc3545;
+    color: white;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    font-family: inherit;
+}
         
         /* TABLE */
         table { width: 100%; border-collapse: collapse; }
@@ -260,6 +274,9 @@ unset($_SESSION['success'], $_SESSION['error']);
                 </select>
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Filter</button>
                 <a href="histori.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
+                   <a href="export_histori_pdf.php" class="btn-export-pdf" target="_blank">
+        <i class="fas fa-file-pdf"></i> Export PDF
+    </a>
             </form>
             
             <!-- TABLE -->

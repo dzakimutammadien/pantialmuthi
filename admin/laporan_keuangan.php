@@ -181,7 +181,7 @@ $bulan_list = [
         .filter-group select, .filter-group input { padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
         .btn-filter { background: #50c878; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
         .btn-reset { background: #6c757d; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
-        
+  
         /* SUMMARY CARDS */
         .summary-grid {
             display: grid;
@@ -225,7 +225,8 @@ $bulan_list = [
             align-items: center;
             gap: 10px;
         }
-        .btn-export-excel {
+.btn-export-excel,
+.btn-export-pdf {
     background: #28a745;
     color: white;
     padding: 8px 20px;
@@ -233,6 +234,15 @@ $bulan_list = [
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
+    font-size: 14px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    font-family: inherit;
+}
+
+.btn-export-pdf {
+    background: #dc3545;
 }
 
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
@@ -305,8 +315,12 @@ $bulan_list = [
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Tampilkan</button>
                 <a href="laporan_keuangan.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
                 <button type="button" class="btn-export-excel" onclick="exportExcel()">
-            <i class="fas fa-file-excel"></i> Export Excel
-        </button>
+    <i class="fas fa-file-excel"></i> Export Excel
+</button>
+
+<a href="export_pdf.php?start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" class="btn-export-pdf" target="_blank">
+    <i class="fas fa-file-pdf"></i> Export PDF
+</a>
        
             </form>
         </div>
