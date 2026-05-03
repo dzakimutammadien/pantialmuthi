@@ -428,6 +428,10 @@ $totalPengeluaranDitolak = mysqli_fetch_assoc($resultPengeluaranDitolak)['total'
                 <i class="fas fa-child"></i>
                 <span>Data Anak Asuh</span>
             </div>
+             <div class="menu-item" onclick="location.href='perkembangan.php'">
+                <i class="fas fa-child"></i>
+                <span>Perkembangan Anak</span>
+            </div>
           
             
         </div>

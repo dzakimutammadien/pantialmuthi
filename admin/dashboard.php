@@ -443,11 +443,20 @@ $recentDonasi = query($queryRecent);
                     <i class="fas fa-child"></i>
                     <span>Data Anak Asuh</span>
                 </div>
-                <div class="submenu-item active" onclick="location.href='galeri.php'"><i class="fas fa-images"></i><span>Galeri</span></div>
+                <div class="submenu-item active" onclick="location.href='galeri.php'">
+                    <i class="fas fa-images"></i>
+                    <span>Galeri</span>
+                </div>
+                <div class="submenu-item active" onclick="location.href='perkembangan.php'">
+                    <i class="fas fa-seedling"></i>
+                    <span>Perkembangan Anak</span>
+                </div>
+                
                 <div class="submenu-item" onclick="location.href='doa_khusus.php'">
                     <i class="fas fa-pray"></i>
                     <span>Data Doa Khusus</span>
                 </div>
+               
             </div>
         </div>
     </div>

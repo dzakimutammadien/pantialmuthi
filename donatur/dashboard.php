@@ -441,6 +441,10 @@ $recentDonasi = query($queryRecent);
                 <i class="fas fa-chart-line"></i>
                 <span>Laporan</span>
             </div>
+            <div class="menu-item" onclick="location.href='perkembangan.php'">
+    <i class="fas fa-seedling"></i>
+    <span>Perkembangan Anak</span>
+</div>
         </div>
     </div>
     
