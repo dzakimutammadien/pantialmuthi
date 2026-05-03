@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: admin/verifikasi_pengeluaran.php
 // HALAMAN VERIFIKASI PENGELUARAN PANTI UNTUK ADMIN
+// DENGAN FITUR EDIT VERIFIKASI
 // ======================================================
 
 require_once '../config/database.php';
@@ -14,9 +15,8 @@ requirePermission('verifikasi_pengeluaran.view');
 $currentUser = getCurrentUser();
 
 // ======================================================
-// PROSES VERIFIKASI
+// PROSES VERIFIKASI (Pertama kali)
 // ======================================================
-
 if (isset($_POST['verifikasi'])) {
     $id = (int)$_POST['id'];
     $status = mysqli_real_escape_string($conn, $_POST['status']);
@@ -36,6 +36,33 @@ if (isset($_POST['verifikasi'])) {
         $_SESSION['success'] = "Pengeluaran berhasil diverifikasi!";
     } else {
         $_SESSION['error'] = "Gagal verifikasi: " . mysqli_error($conn);
+    }
+    header("Location: verifikasi_pengeluaran.php");
+    exit();
+}
+
+// ======================================================
+// PROSES UPDATE VERIFIKASI (EDIT)
+// ======================================================
+if (isset($_POST['update_verifikasi'])) {
+    $id = (int)$_POST['id'];
+    $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $catatan = mysqli_real_escape_string($conn, $_POST['catatan']);
+    $verified_by = $currentUser['id'];
+    $verified_at = date('Y-m-d H:i:s');
+    
+    $sql = "UPDATE pengeluaran SET 
+            status = '$status', 
+            catatan_verifikasi = '$catatan',
+            verified_by = $verified_by,
+            verified_at = '$verified_at'
+            WHERE id = $id";
+    
+    if (mysqli_query($conn, $sql)) {
+        logActivity($currentUser['id'], "Mengupdate verifikasi pengeluaran ID: $id => $status");
+        $_SESSION['success'] = "Verifikasi pengeluaran berhasil diupdate!";
+    } else {
+        $_SESSION['error'] = "Gagal mengupdate verifikasi: " . mysqli_error($conn);
     }
     header("Location: verifikasi_pengeluaran.php");
     exit();
@@ -117,23 +144,27 @@ unset($_SESSION['success'], $_SESSION['error']);
         .submenu.open { max-height: 300px; }
         .submenu-item { padding: 10px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.7); font-size: 13px; }
         .submenu-item:hover { color: #50c878; padding-left: 25px; }
-        .submenu-item i { width: 20px; font-size: 14px; }
         .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
         .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
+        
         /* MAIN CONTENT */
-        .main-content { margin-left: 280px; padding: 20px; }
-        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
+        
+        /* TOPBAR */
+        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
+        .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
         .profile-dropdown { position: relative; }
         .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: white; }
-        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 1000; }
         .profile-dropdown:hover .dropdown-menu { opacity: 1; visibility: visible; }
         .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
+        .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
         
         /* CONTENT */
-        .content-card { background: white; border-radius: 20px; padding: 25px; }
+        .content-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; }
+        .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; }
         .filter-section input { flex: 2; }
         .filter-section select { flex: 1; }
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
@@ -143,7 +174,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         /* TABLE */
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
         .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3e0; color: #ff9800; }
         .status-disetujui { background: #e8f5e9; color: #4caf50; }
@@ -151,6 +182,8 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; }
         .btn-detail { background: #17a2b8; color: white; }
         .btn-verifikasi { background: #ffc107; color: #333; }
+        .btn-edit-verifikasi { background: #2196f3; color: white; }
+        .btn-edit-verifikasi:hover { background: #0b7dda; }
         
         /* ALERT */
         .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
@@ -172,7 +205,8 @@ unset($_SESSION['success'], $_SESSION['error']);
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .radio-group { display: flex; gap: 20px; align-items: center; }
+        .radio-group label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-save { background: #50c878; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
         .btn-cancel { background: #6c757d; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
@@ -181,10 +215,8 @@ unset($_SESSION['success'], $_SESSION['error']);
         .detail-value { font-size: 14px; color: #333; }
         .detail-image { text-align: center; margin: 15px 0; }
         .detail-image img { max-width: 100%; max-height: 300px; border-radius: 10px; cursor: pointer; }
-        .radio-group { display: flex; gap: 20px; align-items: center; }
-        .radio-group label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
         
-        @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } .form-row { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
 <body>
@@ -195,62 +227,20 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div><h3>Panti Asuhan</h3><p>Al-Muthi</p></div>
         </div>
         <div class="sidebar-menu">
-            <!-- Beranda -->
-            <div class="menu-item" onclick="location.href='dashboard.php'">
-                <i class="fas fa-tachometer-alt"></i>
-                <span>Dashboard</span>
-            </div>
-            
-            <!-- Manajemen User -->
-            <div class="menu-item" onclick="location.href='users.php'">
-                <i class="fas fa-users"></i>
-                <span>Manajemen User</span>
-            </div>
-            
-            <!-- Transaksi (dengan submenu) -->
-            <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)">
-                <i class="fas fa-exchange-alt"></i>
-                <span>Transaksi</span>
-                <i class="fas fa-chevron-down arrow"></i>
-            </div>
+            <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
+            <div class="menu-item" onclick="location.href='users.php'"><i class="fas fa-users"></i><span>Manajemen User</span></div>
+            <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-exchange-alt"></i><span>Transaksi</span><i class="fas fa-chevron-down arrow"></i></div>
             <div class="submenu open">
-                <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'">
-                    <i class="fas fa-hand-holding-heart"></i>
-                    <span>Donasi Donatur</span>
-                </div>
-                <div class="submenu-item active" onclick="location.href='verifikasi_pengeluaran.php'">
-                    <i class="fas fa-money-bill-wave"></i>
-                    <span>Pengeluaran Panti</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='laporan_keuangan.php'">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Laporan</span>
-                </div>
+                <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
+                <div class="submenu-item active" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+                <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
             </div>
-            
-            <!-- Master Data (dengan submenu) -->
-            <div class="menu-item has-submenu" onclick="toggleSubmenu(this)">
-                <i class="fas fa-database"></i>
-                <span>Master Data</span>
-                <i class="fas fa-chevron-down arrow"></i>
-            </div>
+            <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
             <div class="submenu">
-                <div class="submenu-item" onclick="location.href='kategori_donasi.php'">
-                    <i class="fas fa-tags"></i>
-                    <span>Kategori Transaksi</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='kategori_role.php'">
-                    <i class="fas fa-user-tag"></i>
-                    <span>Kategori Role</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='anak_asuh.php'">
-                    <i class="fas fa-child"></i>
-                    <span>Data Anak Asuh</span>
-                </div>
-                <div class="submenu-item" onclick="location.href='doa_khusus.php'">
-                    <i class="fas fa-pray"></i>
-                    <span>Data Doa Khusus</span>
-                </div>
+                <div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div>
+                <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
+                <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
+                <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
             </div>
         </div>
     </div>
@@ -297,23 +287,40 @@ unset($_SESSION['success'], $_SESSION['error']);
                     </thead>
                     <tbody>
                         <?php if (count($pengeluarans) > 0): $no = $offset + 1; foreach ($pengeluarans as $p): ?>
-                        <tr>
-                            <td><?php echo $p['id']; ?></td>
-                            <td><?php echo htmlspecialchars($p['pengasuh_nama']); ?></td>
-                            <td><?php echo date('d/m/Y', strtotime($p['tanggal_pengeluaran'])); ?></td>
-                            <td><?php echo htmlspecialchars($p['nama_kategori']); ?></td>
-                            <td><?php echo htmlspecialchars($p['deskripsi']) ?: '-'; ?></td>
-                            <td>Rp <?php echo number_format($p['nominal'], 0, ',', '.'); ?></td>
-                            <td><span class="status-badge status-<?php echo $p['status']; ?>"><?php echo ucfirst($p['status']); ?></span></td>
-                            <td>
-                                <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $p['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
-                                <?php if ($p['status'] == 'pending'): ?>
-                                    <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $p['id']; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
-                                <?php endif; ?>
-                             </td>
-                         </tr>
+                            <?php 
+                                $statusClass = '';
+                                $statusText = '';
+                                if ($p['status'] == 'pending') {
+                                    $statusClass = 'status-pending';
+                                    $statusText = 'Pending';
+                                } elseif ($p['status'] == 'disetujui') {
+                                    $statusClass = 'status-disetujui';
+                                    $statusText = 'Disetujui';
+                                } else {
+                                    $statusClass = 'status-ditolak';
+                                    $statusText = 'Ditolak';
+                                }
+                            ?>
+                            <tr>
+                                <td><?php echo $p['id']; ?></td>
+                                <td><?php echo htmlspecialchars($p['pengasuh_nama']); ?></td>
+                                <td><?php echo date('d/m/Y', strtotime($p['tanggal_pengeluaran'])); ?></td>
+                                <td><?php echo htmlspecialchars($p['nama_kategori']); ?></td>
+                                <td><?php echo htmlspecialchars($p['deskripsi']) ?: '-'; ?></td>
+                                <td>Rp <?php echo number_format($p['nominal'], 0, ',', '.'); ?></td>
+                                <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
+                                <td>
+                                    <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $p['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
+                                    
+                                    <?php if ($p['status'] == 'pending'): ?>
+                                        <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $p['id']; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
+                                    <?php else: ?>
+                                        <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $p['id']; ?>, '<?php echo $p['status']; ?>')"><i class="fas fa-edit"></i> Edit Verifikasi</button>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
                         <?php endforeach; else: ?>
-                         <tr><td colspan="8" style="text-align:center; padding:40px;">Tidak ada data pengeluaran</td></tr>
+                            <tr><td colspan="8" style="text-align:center; padding:40px;">Tidak ada data pengeluaran</td></tr>
                         <?php endif; ?>
                     </tbody>
                  </table>
@@ -336,15 +343,15 @@ unset($_SESSION['success'], $_SESSION['error']);
         <div class="modal-content">
             <div class="modal-header"><h3>Detail Pengeluaran Panti</h3><span class="close-modal" onclick="closeModal('detailModal')">&times;</span></div>
             <div id="detailContent"></div>
-            <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('detailModal')">Tutup</button></div>
+            <div class="modal-footer"><button class="btn-cancel" onclick="closeModal('detailModal')">Tutup</button></div>
         </div>
     </div>
     
-    <!-- MODAL VERIFIKASI -->
+    <!-- MODAL VERIFIKASI (Pertama kali) -->
     <div id="verifikasiModal" class="modal">
         <div class="modal-content">
             <div class="modal-header"><h3>Verifikasi Pengeluaran Panti</h3><span class="close-modal" onclick="closeModal('verifikasiModal')">&times;</span></div>
-            <form method="POST" action="" id="verifikasiForm">
+            <form method="POST" action="">
                 <input type="hidden" name="id" id="verifikasi_id">
                 <div id="verifikasiData"></div>
                 <div class="form-group">
@@ -366,15 +373,41 @@ unset($_SESSION['success'], $_SESSION['error']);
         </div>
     </div>
     
+    <!-- MODAL EDIT VERIFIKASI -->
+    <div id="editVerifikasiModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Edit Verifikasi Pengeluaran</h3><span class="close-modal" onclick="closeModal('editVerifikasiModal')">&times;</span></div>
+            <form method="POST" action="">
+                <input type="hidden" name="id" id="edit_verifikasi_id">
+                <div id="editVerifikasiData"></div>
+                <div class="form-group">
+                    <label>Ubah Status Verifikasi</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="status" value="disetujui" id="edit_status_disetujui"> ✅ Disetujui</label>
+                        <label><input type="radio" name="status" value="ditolak" id="edit_status_ditolak"> ❌ Ditolak</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Catatan Verifikasi</label>
+                    <textarea name="catatan" id="edit_catatan" rows="3" placeholder="Masukkan catatan verifikasi..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('editVerifikasiModal')">Batal</button>
+                    <button type="submit" name="update_verifikasi" class="btn-save">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <script>
         function toggleSubmenu(e){e.classList.toggle('open');let s=e.nextElementSibling;if(s&&s.classList.contains('submenu'))s.classList.toggle('open');}
         
-        function closeModal(id){
-            document.getElementById(id).classList.remove('show');
+        function closeModal(modalId){
+            document.getElementById(modalId).classList.remove('show');
         }
         
         function openDetailModal(id){
-            fetch(`get_pengeluaran.php?id=${id}`)
+            fetch('get_pengeluaran.php?id=' + id)
                 .then(response => response.json())
                 .then(d => {
                     if(d.success){
@@ -395,18 +428,12 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <div class="detail-item"><div class="detail-label">Tanggal Verifikasi</div><div class="detail-value">${p.verified_at || '-'}</div></div>
                         `;
                         document.getElementById('detailModal').classList.add('show');
-                    } else {
-                        alert('Gagal mengambil data pengeluaran');
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Terjadi kesalahan saat mengambil data');
                 });
         }
         
         function openVerifikasiModal(id){
-            fetch(`get_pengeluaran.php?id=${id}`)
+            fetch('get_pengeluaran.php?id=' + id)
                 .then(response => response.json())
                 .then(d => {
                     if(d.success){
@@ -419,16 +446,41 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <div class="detail-item"><div class="detail-label">Kategori</div><div class="detail-value">${p.nama_kategori}</div></div>
                             <div class="detail-item"><div class="detail-label">Jumlah</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(p.nominal)}</div></div>
                             <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${p.deskripsi || '-'}</div></div>
-                            ${p.bukti_foto ? `<div class="detail-image"><img src="../assets/uploads/pengeluaran/${p.bukti_foto}" onclick="window.open(this.src)" style="max-width:100%; max-height:200px;"></div>` : '<div class="detail-image"><p>Tidak ada gambar</p></div>'}
+                            ${p.bukti_foto ? `<div class="detail-image"><img src="../assets/uploads/pengeluaran/${p.bukti_foto}" style="max-width:100%; max-height:200px;"></div>` : '<div class="detail-image"><p>Tidak ada gambar</p></div>'}
                         `;
                         document.getElementById('verifikasiModal').classList.add('show');
-                    } else {
-                        alert('Gagal mengambil data pengeluaran');
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Terjadi kesalahan saat mengambil data');
+                });
+        }
+        
+        function openEditVerifikasiModal(id, currentStatus){
+            fetch('get_pengeluaran.php?id=' + id)
+                .then(response => response.json())
+                .then(d => {
+                    if(d.success){
+                        let p = d.data;
+                        document.getElementById('edit_verifikasi_id').value = p.id;
+                        document.getElementById('editVerifikasiData').innerHTML = `
+                            <div class="detail-item"><div class="detail-label">ID</div><div class="detail-value">${p.id}</div></div>
+                            <div class="detail-item"><div class="detail-label">Pengasuh</div><div class="detail-value">${p.pengasuh_nama}</div></div>
+                            <div class="detail-item"><div class="detail-label">Tanggal</div><div class="detail-value">${p.tanggal_pengeluaran}</div></div>
+                            <div class="detail-item"><div class="detail-label">Kategori</div><div class="detail-value">${p.nama_kategori}</div></div>
+                            <div class="detail-item"><div class="detail-label">Jumlah</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(p.nominal)}</div></div>
+                            <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${p.deskripsi || '-'}</div></div>
+                            <div class="detail-item"><div class="detail-label">Status Saat Ini</div><div class="detail-value"><span class="status-badge ${currentStatus == 'disetujui' ? 'status-disetujui' : 'status-ditolak'}">${currentStatus == 'disetujui' ? 'Disetujui' : 'Ditolak'}</span></div></div>
+                            ${p.bukti_foto ? `<div class="detail-image"><img src="../assets/uploads/pengeluaran/${p.bukti_foto}" style="max-width:100%; max-height:150px;"></div>` : ''}
+                        `;
+                        document.getElementById('edit_catatan').value = p.catatan_verifikasi || '';
+                        
+                        // Set radio button sesuai status saat ini
+                        if (currentStatus == 'disetujui') {
+                            document.getElementById('edit_status_disetujui').checked = true;
+                        } else {
+                            document.getElementById('edit_status_ditolak').checked = true;
+                        }
+                        
+                        document.getElementById('editVerifikasiModal').classList.add('show');
+                    }
                 });
         }
         

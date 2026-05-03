@@ -419,7 +419,7 @@ $recentDonasi = query($queryRecent);
         <div class="sidebar-menu">
             <div class="menu-item active" onclick="location.href='dashboard.php'">
                 <i class="fas fa-tachometer-alt"></i>
-                <span>Beranda</span>
+                <span>Dashboard</span>
             </div>
             <div class="menu-item" onclick="location.href='donasi.php'">
                 <i class="fas fa-hand-holding-heart"></i>

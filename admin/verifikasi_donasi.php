@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: admin/verifikasi_donasi.php
 // HALAMAN VERIFIKASI DONASI UNTUK ADMIN
+// DENGAN FITUR EDIT VERIFIKASI
 // ======================================================
 
 require_once '../config/database.php';
@@ -14,7 +15,7 @@ requirePermission('verifikasi_donasi.view');
 $currentUser = getCurrentUser();
 
 // ======================================================
-// PROSES VERIFIKASI
+// PROSES VERIFIKASI (Pertama kali)
 // ======================================================
 if (isset($_POST['verifikasi'])) {
     $id = (int)$_POST['id'];
@@ -22,18 +23,34 @@ if (isset($_POST['verifikasi'])) {
     $verified_by = $currentUser['id'];
     $verified_at = date('Y-m-d H:i:s');
     
-    // Ambil data donasi sebelum update
-    $query = mysqli_query($conn, "SELECT user_id, catatan_doa FROM donasi WHERE id = $id");
-    $donasi = mysqli_fetch_assoc($query);
-    
     $sql = "UPDATE donasi SET status = '$status', verified_by = $verified_by, verified_at = '$verified_at' WHERE id = $id";
     
     if (mysqli_query($conn, $sql)) {
-        // Jika status menjadi success dan ada catatan doa, trigger akan otomatis insert ke tabel doa
         logActivity($currentUser['id'], "Verifikasi donasi ID: $id => $status");
         $_SESSION['success'] = "Donasi berhasil diverifikasi!";
     } else {
         $_SESSION['error'] = "Gagal verifikasi: " . mysqli_error($conn);
+    }
+    header("Location: verifikasi_donasi.php");
+    exit();
+}
+
+// ======================================================
+// PROSES UPDATE VERIFIKASI (EDIT)
+// ======================================================
+if (isset($_POST['update_verifikasi'])) {
+    $id = (int)$_POST['id'];
+    $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $verified_by = $currentUser['id'];
+    $verified_at = date('Y-m-d H:i:s');
+    
+    $sql = "UPDATE donasi SET status = '$status', verified_by = $verified_by, verified_at = '$verified_at' WHERE id = $id";
+    
+    if (mysqli_query($conn, $sql)) {
+        logActivity($currentUser['id'], "Mengupdate verifikasi donasi ID: $id => $status");
+        $_SESSION['success'] = "Verifikasi donasi berhasil diupdate!";
+    } else {
+        $_SESSION['error'] = "Gagal mengupdate verifikasi: " . mysqli_error($conn);
     }
     header("Location: verifikasi_donasi.php");
     exit();
@@ -54,7 +71,7 @@ if ($search != '') {
 }
 if ($filter_status != '' && $filter_status != 'semua') {
     $where .= " AND d.status = '$filter_status'";
-} 
+}
 if ($filter_kategori != '' && $filter_kategori > 0) {
     $where .= " AND d.kategori_id = $filter_kategori";
 }
@@ -91,7 +108,7 @@ $sql = "SELECT d.*, u.nama_lengkap, u.username, k.nama_kategori,
         JOIN kategori_donasi k ON d.kategori_id = k.id 
         LEFT JOIN users v ON d.verified_by = v.id 
         $where 
-        ORDER BY d.tanggal_donasi ASC 
+        ORDER BY d.tanggal_donasi DESC 
         LIMIT $offset, $limit";
 $donasiList = query($sql);
 
@@ -168,6 +185,8 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; }
         .btn-detail { background: #17a2b8; color: white; }
         .btn-verifikasi { background: #ffc107; color: #333; }
+        .btn-edit-verifikasi { background: #2196f3; color: white; }
+        .btn-edit-verifikasi:hover { background: #0b7dda; }
         
         /* PAGINATION */
         .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
@@ -203,7 +222,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div><h3>Panti Asuhan</h3><p>Al-Muthi</p></div>
         </div>
         <div class="sidebar-menu">
-            <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Beranda</span></div>
+            <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
             <div class="menu-item" onclick="location.href='users.php'"><i class="fas fa-users"></i><span>Manajemen User</span></div>
             <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-exchange-alt"></i><span>Transaksi</span><i class="fas fa-chevron-down arrow"></i></div>
             <div class="submenu open">
@@ -262,10 +281,10 @@ unset($_SESSION['success'], $_SESSION['error']);
                     <?php endforeach; ?>
                 </select>
                 <select name="status">
-                    <option value="pending">Menunggu</option>
+                    <option value="semua">Semua Status</option>
+                    <option value="pending" <?php echo $filter_status == 'pending' ? 'selected' : ''; ?>>Menunggu</option>
                     <option value="success" <?php echo $filter_status == 'success' ? 'selected' : ''; ?>>Sukses</option>
                     <option value="failed" <?php echo $filter_status == 'failed' ? 'selected' : ''; ?>>Tidak Valid</option>
-                    <option value="semua" <?php echo $filter_status == 'semua' ? 'selected' : ''; ?>>Semua Status</option>
                 </select>
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Filter</button>
                 <a href="verifikasi_donasi.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
@@ -310,13 +329,17 @@ unset($_SESSION['success'], $_SESSION['error']);
                                 <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
                                 <td>
                                     <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $d['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
+                                    
                                     <?php if ($d['status'] == 'pending'): ?>
                                         <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $d['id']; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
+                                    <?php else: ?>
+                                        <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $d['id']; ?>, '<?php echo $d['status']; ?>')"><i class="fas fa-edit"></i> Edit Verifikasi</button>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; else: ?>
-                            <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada data donasi</td></tr>
+                            <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada data donasi</td>
+                            </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -357,7 +380,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         </div>
     </div>
     
-    <!-- MODAL VERIFIKASI -->
+    <!-- MODAL VERIFIKASI (Pertama kali) -->
     <div id="verifikasiModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -377,6 +400,31 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel" onclick="closeModal('verifikasiModal')">Batal</button>
                     <button type="submit" name="verifikasi" class="btn-save">Kirim</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- MODAL EDIT VERIFIKASI -->
+    <div id="editVerifikasiModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Verifikasi Donasi</h3>
+                <span class="close-modal" onclick="closeModal('editVerifikasiModal')">&times;</span>
+            </div>
+            <form method="POST" action="">
+                <input type="hidden" name="id" id="edit_verifikasi_id">
+                <div id="editVerifikasiData"></div>
+                <div class="form-group">
+                    <label>Ubah Status Verifikasi</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="status" value="success" id="edit_status_success"> ✅ Disetujui (Sukses)</label>
+                        <label><input type="radio" name="status" value="failed" id="edit_status_failed"> ❌ Ditolak (Tidak Valid)</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('editVerifikasiModal')">Batal</button>
+                    <button type="submit" name="update_verifikasi" class="btn-save">Simpan Perubahan</button>
                 </div>
             </form>
         </div>
@@ -439,6 +487,33 @@ unset($_SESSION['success'], $_SESSION['error']);
                             ${d.bukti_transfer ? `<div class="detail-image"><img src="../assets/uploads/bukti_transfer/${d.bukti_transfer}" style="max-width:100%; max-height:200px;"></div>` : '<div class="detail-image"><p>Tidak ada bukti transfer</p></div>'}
                         `;
                         document.getElementById('verifikasiModal').classList.add('show');
+                    }
+                });
+        }
+        
+        function openEditVerifikasiModal(id, currentStatus) {
+            fetch('get_donasi_admin.php?id=' + id)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let d = data.data;
+                        document.getElementById('edit_verifikasi_id').value = d.id;
+                        document.getElementById('editVerifikasiData').innerHTML = `
+                            <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.nama_lengkap}</div></div>
+                            <div class="detail-item"><div class="detail-label">Tanggal</div><div class="detail-value">${d.tanggal_donasi}</div></div>
+                            <div class="detail-item"><div class="detail-label">Kategori</div><div class="detail-value">${d.nama_kategori}</div></div>
+                            <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.nominal)}</div></div>
+                            <div class="detail-item"><div class="detail-label">Status Saat Ini</div><div class="detail-value"><span class="status-badge ${currentStatus == 'success' ? 'status-success' : 'status-failed'}">${currentStatus == 'success' ? 'Sukses' : 'Tidak Valid'}</span></div></div>
+                        `;
+                        
+                        // Set radio button sesuai status saat ini
+                        if (currentStatus == 'success') {
+                            document.getElementById('edit_status_success').checked = true;
+                        } else {
+                            document.getElementById('edit_status_failed').checked = true;
+                        }
+                        
+                        document.getElementById('editVerifikasiModal').classList.add('show');
                     }
                 });
         }

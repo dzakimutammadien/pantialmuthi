@@ -229,7 +229,11 @@ unset($_SESSION['success'], $_SESSION['error']);
             height: 45px;
             object-fit: contain;
         }
-        
+        .page-title p {
+            font-size: 13px;
+            color: #888;
+            margin-top: 5px;
+        }
         .sidebar-header h3 {
             font-size: 16px;
             margin-bottom: 3px;

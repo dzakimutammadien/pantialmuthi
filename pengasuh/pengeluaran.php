@@ -170,7 +170,7 @@ $sql = "SELECT p.*, u.nama_lengkap as pengasuh_nama, k.nama_kategori,
         END as akses
         FROM pengeluaran p 
         JOIN users u ON p.created_by = u.id 
-        JOIN kategori_pengeluaran k ON p.kategori_id = k.id 
+        JOIN kategori_donasi k ON p.kategori_id = k.id 
         WHERE 1=1 $where 
         ORDER BY p.created_at DESC 
         LIMIT $offset, $limit";
@@ -217,7 +217,11 @@ unset($_SESSION['success'], $_SESSION['error']);
             gap: 12px;
             justify-content: center;
         }
-        
+        .page-title p {
+            font-size: 13px;
+            color: #888;
+            margin-top: 5px;
+        }
         .sidebar-logo {
             width: 45px;
             height: 45px;
@@ -263,7 +267,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             font-size: 14px;
         }
         .main-content { margin-left: 280px; padding: 20px; }
-        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
         .profile-dropdown { position: relative; }
         .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: white; }
@@ -328,11 +332,9 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="menu-item active" onclick="location.href='pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
             <div class="menu-item" onclick="location.href='doa.php'"><i class="fas fa-pray"></i><span>Permohonan Khusus Do'a</span></div>
             <div class="menu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
-            <div class="menu-item" onclick="location.href='laporan.php'">
-        <i class="fas fa-chart-line"></i>
-        <span>Laporan</span>
-    </div>        
-        </div>
+            
+        </div>        
+        
     </div>
     
     <div class="main-content">
