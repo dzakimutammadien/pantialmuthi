@@ -155,26 +155,34 @@ unset($_SESSION['success'], $_SESSION['error']);
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; }
         
-        .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; z-index: 100; }
         .sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; justify-content: center; }
         .sidebar-logo { width: 45px; height: 45px; object-fit: contain; }
-        .sidebar-header h3 { font-size: 16px; }
+        .sidebar-header h3 { font-size: 16px; margin-bottom: 3px; }
+        .sidebar-header p { font-size: 11px; opacity: 0.7; }
         .sidebar-menu { padding: 20px 0; }
         .menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.8); transition: all 0.3s; }
         .menu-item:hover, .menu-item.active { background: rgba(80,200,120,0.3); border-left: 4px solid #50c878; }
-        .menu-item i { width: 24px; }
+        .menu-item i { width: 24px; font-size: 18px; }
+        .menu-item span { font-size: 14px; }
         .submenu { padding-left: 56px; max-height: 0; overflow: hidden; transition: max-height 0.3s; }
         .submenu.open { max-height: 300px; }
         .submenu-item { padding: 10px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.7); font-size: 13px; }
+        .submenu-item:hover { color: #50c878; padding-left: 25px; }
+        .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
+        .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
         
-        .main-content { margin-left: 280px; padding: 20px; }
-        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
+        
+        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
+        .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
         .profile-dropdown { position: relative; }
-        .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: white; }
+        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 1000; }
         .profile-dropdown:hover .dropdown-menu { opacity: 1; visibility: visible; }
-        .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; }
+        .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
+        .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
         
         .content-card { background: white; border-radius: 20px; padding: 25px; }
         .btn-tambah { background: #50c878; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 20px; }
@@ -222,14 +230,38 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
                 <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
             </div>
-            <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
-            <div class="submenu">
-                <div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div>
-                <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
-                <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
-                <div class="submenu-item active" onclick="location.href='galeri.php'"><i class="fas fa-images"></i><span>Galeri</span></div>
-                <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
-            </div>
+            <!-- Master Data (dengan submenu) - TERBUKA OTOMATIS -->
+<div class="menu-item has-submenu open" onclick="toggleSubmenu(this)">
+    <i class="fas fa-database"></i>
+    <span>Master Data</span>
+    <i class="fas fa-chevron-down arrow"></i>
+</div>
+<div class="submenu open">
+    <div class="submenu-item" onclick="location.href='kategori_donasi.php'">
+        <i class="fas fa-tags"></i>
+        <span>Kategori Transaksi</span>
+    </div>
+    <div class="submenu-item" onclick="location.href='kategori_role.php'">
+        <i class="fas fa-user-tag"></i>
+        <span>Kategori Role</span>
+    </div>
+    <div class="submenu-item" onclick="location.href='anak_asuh.php'">
+        <i class="fas fa-child"></i>
+        <span>Data Anak Asuh</span>
+    </div>
+    <div class="submenu-item active" onclick="location.href='galeri.php'">
+        <i class="fas fa-images"></i>
+        <span>Galeri</span>
+    </div>
+    <div class="submenu-item" onclick="location.href='perkembangan.php'">
+        <i class="fas fa-seedling"></i>
+        <span>Perkembangan Anak</span>
+    </div>
+    <div class="submenu-item" onclick="location.href='doa_khusus.php'">
+        <i class="fas fa-pray"></i>
+        <span>Data Doa Khusus</span>
+    </div>
+</div>
         </div>
     </div>
     

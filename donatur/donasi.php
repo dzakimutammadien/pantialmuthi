@@ -265,7 +265,11 @@ unset($_SESSION['success']);
             <div class="menu-item" onclick="location.href='histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
             <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
             <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khususon Do'a</span></div>
-            <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
+            <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+                    <div class="menu-item" onclick="location.href='perkembangan.php'">
+    <i class="fas fa-seedling"></i>
+    <span>Perkembangan Anak</span>
+</div>
         </div>
     </div>
     

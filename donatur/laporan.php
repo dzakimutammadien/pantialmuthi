@@ -213,6 +213,10 @@ $kategori_laporan = query($sql_kategori);
             <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Laporan Pengeluaran</span></div>
             <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
             <div class="menu-item active" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+             <div class="menu-item" onclick="location.href='perkembangan.php'">
+    <i class="fas fa-seedling"></i>
+    <span>Perkembangan Anak</span>
+</div>
         </div>
     </div>
     

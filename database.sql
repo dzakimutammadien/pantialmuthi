@@ -4,9 +4,9 @@
 -- PANTI ASUHAN AL-MUTHI
 -- ======================================================
 
-DROP DATABASE IF EXISTS pantialmuthi;
-CREATE DATABASE pantialmuthi;
-USE pantialmuthi;
+DROP DATABASE IF EXISTS almuthi;
+CREATE DATABASE almuthi;
+USE almuthi;
 
 -- ======================================================
 -- 1. TABEL roles

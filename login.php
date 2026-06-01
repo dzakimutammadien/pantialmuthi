@@ -1,7 +1,7 @@
 <?php
 // ======================================================
 // FILE: login.php
-// HALAMAN LOGIN + DONASI (dengan nama donatur opsional)
+// HALAMAN LOGIN + DONASI + PROGRAM KAMI
 // ======================================================
 
 require_once 'config/database.php';
@@ -106,6 +106,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
 // Ambil kategori untuk dropdown donasi
 $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both') ORDER BY nama_kategori ASC");
+
+// Ambil program untuk crowdfunding
+$sql_program = "SELECT p.*, 
+                (SELECT COUNT(*) FROM donasi_program WHERE program_id = p.id AND status = 'success') as jumlah_donatur,
+                (SELECT SUM(nominal) FROM donasi_program WHERE program_id = p.id AND status = 'success') as total_terkumpul
+                FROM program_donasi p 
+                WHERE p.status = 'aktif' 
+                ORDER BY p.created_at DESC 
+                LIMIT 3";
+$program_list = query($sql_program);
 ?>
 
 <!DOCTYPE html>
@@ -327,6 +337,148 @@ $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both
             border-left: 4px solid #f44336;
         }
         
+        /* PROGRAM SECTION */
+        .program-section {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-top: 25px;
+        }
+        
+        .program-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .program-header h2 {
+            font-size: 22px;
+            color: #1a3a2a;
+            margin-bottom: 5px;
+        }
+        
+        .program-header p {
+            font-size: 13px;
+            color: #888;
+        }
+        
+        .program-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .program-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .program-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #50c878;
+        }
+        
+        .program-icon {
+            margin-bottom: 15px;
+    background: #f0f2f5;
+    border-radius: 10px;
+    overflow: hidden;
+    height: 180px;
+        }
+        
+        .program-icon img {
+           width: 100%;
+    height: 100%;
+    object-fit: cover 
+        }
+  
+        .program-card h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .program-card p {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .progress-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            background: #50c878;
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        
+        .donatur-count {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 15px;
+        }
+        
+        .btn-donasi-program {
+            display: inline-block;
+            background: #50c878;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-donasi-program:hover {
+            background: #2e8b57;
+            transform: scale(1.02);
+        }
+        
+        .program-footer {
+            text-align: center;
+        }
+        
+        .btn-lihat-semua {
+            display: inline-block;
+            background: transparent;
+            color: #50c878;
+            padding: 8px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid #50c878;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-lihat-semua:hover {
+            background: #50c878;
+            color: white;
+        }
+        
         /* GALERI PREVIEW */
         .galeri-preview-grid {
             display: grid;
@@ -361,7 +513,7 @@ $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both
             pointer-events: none;
         }
         
-        .btn-lihat-semua {
+        .btn-lihat-semua-galeri {
             display: inline-block;
             background: #50c878;
             color: white;
@@ -371,11 +523,26 @@ $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both
             font-size: 13px;
             margin-top: 15px;
         }
-        
+        .qris-image {
+    text-align: center;
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 10px;
+    margin-top: 5px;
+}
+
+.qris-image img {
+    width: 80px;
+}
         @media (max-width: 900px) {
             .main-layout { flex-direction: column; }
             .galeri-preview-grid { grid-template-columns: repeat(2, 1fr); }
         }
+        @media (max-width: 768px) {
+    .donasi-section .card-body form > div {
+        grid-template-columns: 1fr !important;
+    }
+}
     </style>
 </head>
 <body>
@@ -443,58 +610,41 @@ $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both
                         </a>
                     </div>
                     
-                </div>
-            </div>
-            
-            <!-- GALERI PREVIEW -->
-            <div class="card">
-                <div class="card-header">
-                    <h2><i class="fas fa-images"></i> Galeri Kegiatan</h2>
-                    <p>Dokumentasi kegiatan panti asuhan</p>
-                </div>
-                <div class="card-body">
-                    <div class="galeri-preview-grid">
-                        <?php
-                        $sql_galeri = "SELECT * FROM galeri WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 6";
-                        $galeri_preview = query($sql_galeri);
-                        ?>
-                        <?php if (count($galeri_preview) > 0): ?>
-                            <?php foreach ($galeri_preview as $g): ?>
-                                <div class="galeri-preview-item" onclick="window.open('galeri.php', '_blank')">
-                                    <img src="assets/uploads/galeri/<?php echo $g['file_path']; ?>" alt="<?php echo $g['judul']; ?>">
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div style="grid-column: 1/-1; text-align: center; padding: 20px;">Belum ada galeri</div>
-                        <?php endif; ?>
-                    </div>
-                    <div style="text-align: center;">
-                        <a href="galeri.php" class="btn-lihat-semua">Lihat Semua Galeri</a>
+                    <div class="demo-credentials">
+                        <strong>🔐 Demo Akun:</strong><br>
+                        Admin: admin / 12345678<br>
+                        Pengasuh: pengasuh / 12345678<br>
+                        Donatur: donatur / 12345678
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- KOLOM KANAN: DONASI -->
-        <div class="donasi-section">
-            <div class="card">
-                <div class="card-header">
-                    <h2><i class="fas fa-hand-holding-heart"></i> Donasi Cepat</h2>
-                    <p>Isi nama Anda (opsional) - jika kosong akan tercatat sebagai "Hamba Allah"</p>
-                </div>
-                <div class="card-body">
-                    <?php if ($donasi_success): ?>
-                        <div class="alert alert-success"><?php echo $donasi_success; ?></div>
-                    <?php endif; ?>
-                    <?php if ($donasi_error): ?>
-                        <div class="alert alert-error"><?php echo $donasi_error; ?></div>
-                    <?php endif; ?>
+       <!-- KOLOM KANAN: DONASI -->
+<div class="donasi-section">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-hand-holding-heart"></i> Donasi Cepat</h2>
+            <p>Isi nama Anda (opsional) - jika kosong akan tercatat sebagai "Hamba Allah"</p>
+        </div>
+        <div class="card-body">
+            <?php if ($donasi_success): ?>
+                <div class="alert alert-success"><?php echo $donasi_success; ?></div>
+            <?php endif; ?>
+            <?php if ($donasi_error): ?>
+                <div class="alert alert-error"><?php echo $donasi_error; ?></div>
+            <?php endif; ?>
+            
+            <form method="POST" enctype="multipart/form-data">
+                <!-- FORM 2 KOLOM -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     
-                    <form method="POST" enctype="multipart/form-data">
+                    <!-- KOLOM KIRI -->
+                    <div>
                         <div class="form-group">
                             <label>Nama Donatur (Opsional)</label>
                             <input type="text" name="nama_donatur" placeholder="Kosongkan jika ingin anonim">
-                            <small style="color:#888;">Nama akan tercatat sesuai isian. Jika kosong, akan menjadi "Hamba Allah"</small>
+                            <small style="color:#888;">Nama akan tercatat sesuai isian</small>
                         </div>
                         
                         <div class="form-group">
@@ -517,7 +667,10 @@ $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both
                             <input type="file" name="bukti_transfer" accept="image/*,application/pdf" required>
                             <small style="color:#888;">Format: JPG, PNG, PDF</small>
                         </div>
-                        
+                    </div>
+                    
+                    <!-- KOLOM KANAN -->
+                    <div>
                         <div class="form-group">
                             <label>Keterangan (Opsional)</label>
                             <textarea name="keterangan" rows="2" placeholder="Catatan donasi..."></textarea>
@@ -528,27 +681,121 @@ $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both
                             <textarea name="catatan_doa" rows="2" placeholder="Tulis doa atau pesan..."></textarea>
                         </div>
                         
-                        <button type="submit" name="donasi" class="btn-donasi">
-                            <i class="fas fa-paper-plane"></i> Kirim Donasi
-                        </button>
-                    </form>
-                    
-                    <hr>
-                    
-                    <div class="qris-image">
-                        <p style="font-size: 12px; color: #888; margin-bottom: 10px;">
-                            <i class="fas fa-qrcode"></i> Scan QRIS untuk donasi cepat
-                        </p>
-                        <img src="assets/image/qris.jpeg" alt="QRIS" onerror="this.src='assets/image/almuthi.png'">
-                        <p style="font-size: 11px; color: #888; margin-top: 10px;">
-                            Bank BRI: 0821-3191-3839-9383-92<br>
-                            a.n Yayasan Sosial Bina Umat Al-Muthi
-                        </p>
+                        <!-- QRIS DIPINDAHKAN KE SINI -->
+                        <div class="qris-image" style="margin-top: 10px;">
+                            <p style="font-size: 11px; color: #888; margin-bottom: 8px;">
+                                <i class="fas fa-qrcode"></i> Scan QRIS
+                            </p>
+                            <img src="assets/image/qris.jpeg" alt="QRIS" style="width: 100px; border-radius: 10px;" onerror="this.src='assets/image/almuthi.png'">
+                            <p style="font-size: 10px; color: #888; margin-top: 8px;">
+                                BRI: 0821-3191-3839-9383-92
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
+                
+                <button type="submit" name="donasi" class="btn-donasi" style="margin-top: 10px; width: 100%;">
+                    <i class="fas fa-paper-plane"></i> Kirim Donasi
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+        
+    </div>
+    
+    <!-- ====================================================== -->
+    <!-- PROGRAM KAMI (CROWDFUNDING) - DITARUH DI BAWAH MAIN-LAYOUT -->
+    <!-- ====================================================== -->
+    <div class="program-section">
+        <div class="program-header">
+            <h2><i class="fas fa-chalkboard-user"></i> Program Kami</h2>
+            <p>Donasi untuk program-program panti asuhan Al-Muthi</p>
         </div>
         
+        <div class="program-grid">
+            <?php if (count($program_list) > 0): ?>
+                <?php foreach ($program_list as $program):
+    $terkumpul = $program['total_terkumpul'] ?? 0;
+    $persen = ($program['target_nominal'] > 0) ? round(($terkumpul / $program['target_nominal']) * 100) : 0;
+    $persen = min($persen, 100);
+?>
+                <div class="program-card">
+                    <div class="program-icon">
+                        <?php if ($program['gambar']): ?>
+                            <img src="assets/uploads/program/<?php echo $program['gambar']; ?>" alt="<?php echo $program['nama_program']; ?>">
+                        <?php else: ?>
+                            <i class="fas fa-hand-holding-heart"></i>
+                        <?php endif; ?>
+                    </div>
+                    <h3><?php echo htmlspecialchars($program['nama_program']); ?></h3>
+                    <p><?php echo htmlspecialchars(substr($program['deskripsi'], 0, 60)) . '...'; ?></p>
+                    
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <?php echo $persen; ?>%;"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span><?php echo $persen; ?>%</span>
+                        <span>Rp <?php echo number_format($program['terkumpul'], 0, ',', '.'); ?> / Rp <?php echo number_format($program['target_nominal'], 0, ',', '.'); ?></span>
+                    </div>
+                    
+                    <div class="donatur-count">
+                        <i class="fas fa-users"></i> <?php echo $program['jumlah_donatur']; ?> Donatur
+                    </div>
+                    
+                    <a href="program_detail.php?id=<?php echo $program['id']; ?>" class="btn-donasi-program">
+                        <i class="fas fa-hand-holding-heart"></i> Donasi Sekarang
+                    </a>
+                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="program-card">
+                    <div class="program-icon"><i class="fas fa-chalkboard-user"></i></div>
+                    <h3>Program akan segera hadir</h3>
+                    <p>Pantau terus website ini untuk program-program terbaru dari Panti Asuhan Al-Muthi</p>
+                    <div class="donatur-count">-</div>
+                    <a href="#" class="btn-donasi-program disabled" style="background:#ccc; cursor:not-allowed;">Segera Hadir</a>
+                </div>
+            <?php endif; ?>
+        </div>
+        
+        <div class="program-footer">
+            <a href="semua_program.php" class="btn-lihat-semua">
+                <i class="fas fa-arrow-right"></i> Lihat Semua Program
+            </a>
+        </div>
+    </div>
+    
+    <!-- GALERI PREVIEW -->
+    <div class="card" style="margin-top: 0;">
+        <div class="card-header">
+            <h2><i class="fas fa-images"></i> Galeri Kegiatan</h2>
+            <p>Dokumentasi kegiatan panti asuhan</p>
+        </div>
+        <div class="card-body">
+            <div class="galeri-preview-grid">
+                <?php
+                $sql_galeri = "SELECT * FROM galeri WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 6";
+                $galeri_preview = query($sql_galeri);
+                ?>
+                <?php if (count($galeri_preview) > 0): ?>
+                    <?php foreach ($galeri_preview as $g): ?>
+                        <div class="galeri-preview-item" onclick="window.open('galeri.php', '_blank')">
+                            <img src="assets/uploads/galeri/<?php echo $g['file_path']; ?>" alt="<?php echo $g['judul']; ?>">
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div style="grid-column: 1/-1; text-align: center; padding: 20px;">Belum ada galeri</div>
+                <?php endif; ?>
+            </div>
+            <div style="text-align: center;">
+                <a href="galeri.php" class="btn-lihat-semua-galeri">Lihat Semua Galeri</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-text" style="text-align: center; font-size: 11px; color: #888; margin-top: 20px; padding: 15px;">
+        © 2025 Panti Asuhan Al-Muthi | Lembaga Amil Zakat Nasional
     </div>
 </div>
 </body>

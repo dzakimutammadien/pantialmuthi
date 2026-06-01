@@ -29,7 +29,6 @@ function uploadFoto($existing_foto = null) {
         $target = '../assets/uploads/users/' . $filename;
         
         if (move_uploaded_file($_FILES['foto']['tmp_name'], $target)) {
-            // Hapus foto lama jika bukan default
             if ($existing_foto && $existing_foto != 'default-user.png' && file_exists('../assets/uploads/users/' . $existing_foto)) {
                 unlink('../assets/uploads/users/' . $existing_foto);
             }
@@ -55,7 +54,6 @@ if (isset($_POST['tambah'])) {
     $role_id = (int)$_POST['role_id'];
     $is_active = isset($_POST['is_active']) ? 1 : 0;
     
-    // Upload foto
     $upload = uploadFoto();
     $foto = $upload['success'] ? $upload['filename'] : 'default-user.png';
     
@@ -87,11 +85,9 @@ if (isset($_POST['edit'])) {
     $role_id = (int)$_POST['role_id'];
     $is_active = isset($_POST['is_active']) ? 1 : 0;
     
-    // Ambil foto lama
     $query_foto = mysqli_query($conn, "SELECT foto_profil FROM users WHERE id = $id");
     $old_foto = mysqli_fetch_assoc($query_foto)['foto_profil'];
     
-    // Upload foto baru
     $upload = uploadFoto($old_foto);
     $foto = $upload['success'] ? $upload['filename'] : $old_foto;
     
@@ -123,27 +119,43 @@ if (isset($_POST['edit'])) {
     exit();
 }
 
-// Hapus User (beserta fotonya)
+// ======================================================
+// HAPUS USER (DENGAN PENGECEKAN DATA TERKAIT)
+// ======================================================
 if (isset($_GET['hapus'])) {
     $id = (int)$_GET['hapus'];
     
     if ($id == $currentUser['id']) {
         $_SESSION['error'] = "Anda tidak bisa menghapus akun sendiri!";
     } else {
-        // Ambil foto untuk dihapus
-        $query_foto = mysqli_query($conn, "SELECT foto_profil FROM users WHERE id = $id");
-        $foto = mysqli_fetch_assoc($query_foto)['foto_profil'];
+        // Cek apakah user memiliki data terkait
+        $check_donasi = mysqli_query($conn, "SELECT COUNT(*) as total FROM donasi WHERE user_id = $id");
+        $check_pengeluaran = mysqli_query($conn, "SELECT COUNT(*) as total FROM pengeluaran WHERE created_by = $id");
+        $check_doa = mysqli_query($conn, "SELECT COUNT(*) as total FROM doa WHERE user_id = $id");
+        $check_anak = mysqli_query($conn, "SELECT COUNT(*) as total FROM anak_asuh WHERE created_by = $id");
         
-        $sql = "DELETE FROM users WHERE id = $id";
-        if (mysqli_query($conn, $sql)) {
-            // Hapus file foto jika bukan default
-            if ($foto && $foto != 'default-user.png' && file_exists('../assets/uploads/users/' . $foto)) {
-                unlink('../assets/uploads/users/' . $foto);
-            }
-            logActivity($currentUser['id'], "Menghapus user ID: $id");
-            $_SESSION['success'] = "User berhasil dihapus!";
+        $donasi_count = mysqli_fetch_assoc($check_donasi)['total'];
+        $pengeluaran_count = mysqli_fetch_assoc($check_pengeluaran)['total'];
+        $doa_count = mysqli_fetch_assoc($check_doa)['total'];
+        $anak_count = mysqli_fetch_assoc($check_anak)['total'];
+        
+        if ($donasi_count > 0 || $pengeluaran_count > 0 || $doa_count > 0 || $anak_count > 0) {
+            $_SESSION['error'] = "User tidak bisa dihapus karena memiliki data terkait! (Donasi: $donasi_count, Pengeluaran: $pengeluaran_count, Doa: $doa_count, Anak Asuh: $anak_count)";
         } else {
-            $_SESSION['error'] = "Gagal menghapus user: " . mysqli_error($conn);
+            // Ambil foto untuk dihapus
+            $query_foto = mysqli_query($conn, "SELECT foto_profil FROM users WHERE id = $id");
+            $foto = mysqli_fetch_assoc($query_foto)['foto_profil'];
+            
+            $sql = "DELETE FROM users WHERE id = $id";
+            if (mysqli_query($conn, $sql)) {
+                if ($foto && $foto != 'default-user.png' && file_exists('../assets/uploads/users/' . $foto)) {
+                    unlink('../assets/uploads/users/' . $foto);
+                }
+                logActivity($currentUser['id'], "Menghapus user ID: $id");
+                $_SESSION['success'] = "User berhasil dihapus!";
+            } else {
+                $_SESSION['error'] = "Gagal menghapus user: " . mysqli_error($conn);
+            }
         }
     }
     header("Location: users.php");
@@ -243,28 +255,34 @@ unset($_SESSION['success'], $_SESSION['error']);
         .submenu-item i { width: 20px; font-size: 14px; }
         .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
         .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
-        .main-content { margin-left: 280px; padding: 20px; }
-        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
+        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
+        .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
         .profile-dropdown { position: relative; }
         .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: white; }
-        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 1000; }
         .profile-dropdown:hover .dropdown-menu { opacity: 1; visibility: visible; }
         .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
-        .content-card { background: white; border-radius: 20px; padding: 25px; }
-        .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; }
-        .btn-filter { background: #50c878; color: white; padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; }
-        .btn-reset { background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-tambah { background: #50c878; color: white; padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; }
+        .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
+        .content-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; }
+        .filter-section input { flex: 2; }
+        .filter-section select { flex: 1; }
+        .btn-filter, .btn-reset, .btn-tambah { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
+        .btn-filter { background: #50c878; color: white; }
+        .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
+        .btn-tambah { background: #50c878; color: white; }
+        
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; background: #f8f9fa; }
-        td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
         .foto-thumb { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #f0f2f5; }
-        .badge-aktif { background: #e8f5e9; color: #4caf50; padding: 4px 12px; border-radius: 20px; font-size: 11px; }
-        .badge-nonaktif { background: #ffebee; color: #f44336; padding: 4px 12px; border-radius: 20px; font-size: 11px; }
-        .badge-role { background: #e3f2fd; color: #2196f3; padding: 4px 12px; border-radius: 20px; font-size: 11px; }
-        .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; }
+        .badge-aktif { background: #e8f5e9; color: #4caf50; padding: 4px 12px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-nonaktif { background: #ffebee; color: #f44336; padding: 4px 12px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-role { background: #e3f2fd; color: #2196f3; padding: 4px 12px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; display: inline-block; white-space: nowrap; }
         .btn-detail { background: #17a2b8; color: white; }
         .btn-edit { background: #50c878; color: white; }
         .btn-toggle { background: #ffc107; color: #333; }
@@ -272,7 +290,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
         .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
         .alert-error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
-        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
+        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
         .pagination a, .pagination span { padding: 8px 14px; border-radius: 8px; text-decoration: none; }
         .pagination a { background: #f0f2f5; color: #555; }
         .pagination .active { background: #50c878; color: white; }
@@ -292,23 +310,10 @@ unset($_SESSION['success'], $_SESSION['error']);
         .current-photo img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #50c878; }
         .detail-foto { text-align: center; margin-bottom: 20px; }
         .detail-foto img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #50c878; }
-        .detail-item {
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #f0f0f0;
-}
-.detail-label {
-    font-weight: 600;
-    font-size: 12px;
-    color: #888;
-    margin-bottom: 5px;
-}
-.detail-value {
-    font-size: 14px;
-    color: #333;
-}
+        .detail-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+        .detail-label { font-weight: 600; font-size: 12px; color: #888; margin-bottom: 5px; }
+        .detail-value { font-size: 14px; color: #333; }
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } .form-row { grid-template-columns: 1fr; } }
-
     </style>
 </head>
 <body>
@@ -321,26 +326,57 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
             <div class="menu-item active" onclick="location.href='users.php'"><i class="fas fa-users"></i><span>Manajemen User</span></div>
             <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-exchange-alt"></i><span>Transaksi</span><i class="fas fa-chevron-down arrow"></i></div>
-            <div class="submenu"><div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div><div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div><div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div></div>
-            <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
-            <div class="submenu"><div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div><div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div><div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div><div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div></div>
+            <div class="submenu">
+                <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
+                <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+                <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+            </div>
+            <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
+            <div class="submenu open">
+                <div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div>
+                <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
+                <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
+                <div class="submenu-item" onclick="location.href='galeri.php'"><i class="fas fa-images"></i><span>Galeri</span></div>
+                <div class="submenu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
+                <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
+            </div>
         </div>
     </div>
     
     <div class="main-content">
         <div class="topbar">
             <div class="page-title"><h2>Manajemen User</h2><p>Kelola data pengguna sistem</p></div>
-            <div class="profile-dropdown"><div class="profile-icon"><i class="fas fa-cog"></i></div><div class="dropdown-menu"><a href="profil.php"><i class="fas fa-user-circle"></i> Profil</a><a href="log_aktivitas.php"><i class="fas fa-history"></i> Log Aktivitas</a><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></div></div>
+            <div class="profile-dropdown">
+                <div class="profile-icon"><i class="fas fa-cog"></i></div>
+                <div class="dropdown-menu">
+                    <a href="profil.php"><i class="fas fa-user-circle"></i> Profil</a>
+                    <a href="log_aktivitas.php"><i class="fas fa-history"></i> Log Aktivitas</a>
+                    <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                </div>
+            </div>
         </div>
         
         <div class="content-card">
-            <?php if ($success): ?><div class="alert alert-success"><?php echo $success; ?></div><?php endif; ?>
-            <?php if ($error): ?><div class="alert alert-error"><?php echo $error; ?></div><?php endif; ?>
+            <?php if ($success): ?>
+                <div class="alert alert-success"><?php echo $success; ?></div>
+            <?php endif; ?>
+            <?php if ($error): ?>
+                <div class="alert alert-error"><?php echo $error; ?></div>
+            <?php endif; ?>
             
             <form method="GET" action="" class="filter-section">
                 <input type="text" name="search" placeholder="Cari nama, username..." value="<?php echo htmlspecialchars($search); ?>">
-                <select name="role"><option value="semua">Semua Role</option><?php foreach ($roles as $role): ?><option value="<?php echo $role['nama_role']; ?>" <?php echo $filter_role == $role['nama_role'] ? 'selected' : ''; ?>><?php echo ucfirst($role['nama_role']); ?></option><?php endforeach; ?></select>
-                <select name="status"><option value="semua">Semua Status</option><option value="aktif" <?php echo $filter_status == 'aktif' ? 'selected' : ''; ?>>Aktif</option><option value="nonaktif" <?php echo $filter_status == 'nonaktif' ? 'selected' : ''; ?>>Nonaktif</option></select>
+                <select name="role">
+                    <option value="semua">Semua Role</option>
+                    <?php foreach ($roles as $role): ?>
+                        <option value="<?php echo $role['nama_role']; ?>" <?php echo $filter_role == $role['nama_role'] ? 'selected' : ''; ?>><?php echo ucfirst($role['nama_role']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="status">
+                    <option value="semua">Semua Status</option>
+                    <option value="aktif" <?php echo $filter_status == 'aktif' ? 'selected' : ''; ?>>Aktif</option>
+                    <option value="nonaktif" <?php echo $filter_status == 'nonaktif' ? 'selected' : ''; ?>>Nonaktif</option>
+                </select>
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Filter</button>
                 <a href="users.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
                 <button type="button" class="btn-tambah" onclick="openTambahModal()"><i class="fas fa-plus"></i> Tambah</button>
@@ -352,7 +388,14 @@ unset($_SESSION['success'], $_SESSION['error']);
                         <tr><th>No</th><th>Foto</th><th>Nama</th><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr>
                     </thead>
                     <tbody>
-                        <?php if (count($users) > 0): $no = $offset + 1; foreach ($users as $user): ?>
+                        <?php if (count($users) > 0): $no = $offset + 1; foreach ($users as $user): 
+                            // Cek apakah user memiliki data terkait
+                            $check_donasi = mysqli_query($conn, "SELECT COUNT(*) as total FROM donasi WHERE user_id = " . $user['id']);
+                            $donasi_count = mysqli_fetch_assoc($check_donasi)['total'];
+                            $check_pengeluaran = mysqli_query($conn, "SELECT COUNT(*) as total FROM pengeluaran WHERE created_by = " . $user['id']);
+                            $pengeluaran_count = mysqli_fetch_assoc($check_pengeluaran)['total'];
+                            $has_data = ($donasi_count > 0 || $pengeluaran_count > 0);
+                        ?>
                         <tr>
                             <td><?php echo $no++; ?></td>
                             <td><img src="../assets/uploads/users/<?php echo $user['foto_profil'] ?: 'default-user.png'; ?>" class="foto-thumb" onerror="this.src='../assets/uploads/users/default-user.png'"></td>
@@ -363,8 +406,17 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <td>
                                 <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $user['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
                                 <button class="btn-action btn-edit" onclick="openEditModal(<?php echo $user['id']; ?>)"><i class="fas fa-edit"></i> Edit</button>
-                                <button class="btn-action btn-toggle" onclick="toggleStatus(<?php echo $user['id']; ?>, <?php echo $user['is_active']; ?>)"><i class="fas fa-<?php echo $user['is_active'] ? 'ban' : 'check-circle'; ?>"></i> <?php echo $user['is_active'] ? 'Nonaktifkan' : 'Aktifkan'; ?></button>
-                                <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['nama_lengkap']); ?>')"><i class="fas fa-trash"></i> Hapus</button>
+                                <button class="btn-action btn-toggle" onclick="toggleStatus(<?php echo $user['id']; ?>, <?php echo $user['is_active']; ?>)">
+                                    <i class="fas fa-<?php echo $user['is_active'] ? 'ban' : 'check-circle'; ?>"></i>
+                                    <?php echo $user['is_active'] ? 'Nonaktifkan' : 'Aktifkan'; ?>
+                                </button>
+                                <?php if (!$has_data): ?>
+                                    <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['nama_lengkap']); ?>')">
+                                        <i class="fas fa-trash"></i> Hapus
+                                    </button>
+                                <?php else: ?>
+                                    <span style="color:#888; font-size:11px; display:inline-block; margin-left:5px;">(Tidak bisa dihapus)</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; else: ?>
@@ -481,46 +533,52 @@ unset($_SESSION['success'], $_SESSION['error']);
         }
         
         function openDetailModal(id){
-    fetch(`get_user.php?id=${id}&_=${Date.now()}`)  // Tambah timestamp biar tidak cache
-        .then(r=>r.json())
-        .then(d=>{
-            if(d.success){
-                let u = d.user;
-                let statusText = u.is_active == 1 ? 'Aktif' : 'Nonaktif';
-                let fotoUrl = `../assets/uploads/users/${u.foto_profil || 'default-user.png'}?_=${Date.now()}`;
-                
-                document.getElementById('detailContent').innerHTML = `
-                    <div class="detail-foto"><img src="${fotoUrl}" onerror="this.src='../assets/uploads/users/default-user.png'"></div>
-                    <div class="detail-item"><div class="detail-label">Nama Lengkap</div><div class="detail-value">${u.nama_lengkap}</div></div>
-                    <div class="detail-item"><div class="detail-label">Username</div><div class="detail-value">${u.username}</div></div>
-                    <div class="detail-item"><div class="detail-label">Jenis Kelamin</div><div class="detail-value">${u.jenis_kelamin=='L'?'Laki-laki':'Perempuan'}</div></div>
-                    <div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">${u.email||'-'}</div></div>
-                    <div class="detail-item"><div class="detail-label">No. Whatsapp</div><div class="detail-value">${u.no_whatsapp||'-'}</div></div>
-                    <div class="detail-item"><div class="detail-label">Alamat</div><div class="detail-value">${u.alamat||'-'}</div></div>
-                    <div class="detail-item"><div class="detail-label">Role</div><div class="detail-value">${u.nama_role}</div></div>
-                    <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${statusText}</div></div>
-                    <div class="detail-item"><div class="detail-label">Dibuat Pada</div><div class="detail-value">${u.created_at}</div></div>
-                `;
-                document.getElementById('detailModal').classList.add('show');
+            fetch(`get_user.php?id=${id}&_=${Date.now()}`)
+                .then(r=>r.json())
+                .then(d=>{
+                    if(d.success){
+                        let u = d.user;
+                        let statusText = u.is_active == 1 ? 'Aktif' : 'Nonaktif';
+                        let fotoUrl = `../assets/uploads/users/${u.foto_profil || 'default-user.png'}?_=${Date.now()}`;
+                        
+                        document.getElementById('detailContent').innerHTML = `
+                            <div class="detail-foto"><img src="${fotoUrl}" onerror="this.src='../assets/uploads/users/default-user.png'"></div>
+                            <div class="detail-item"><div class="detail-label">Nama Lengkap</div><div class="detail-value">${u.nama_lengkap}</div></div>
+                            <div class="detail-item"><div class="detail-label">Username</div><div class="detail-value">${u.username}</div></div>
+                            <div class="detail-item"><div class="detail-label">Jenis Kelamin</div><div class="detail-value">${u.jenis_kelamin=='L'?'Laki-laki':'Perempuan'}</div></div>
+                            <div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">${u.email||'-'}</div></div>
+                            <div class="detail-item"><div class="detail-label">No. Whatsapp</div><div class="detail-value">${u.no_whatsapp||'-'}</div></div>
+                                                       <div class="detail-item"><div class="detail-label">Alamat</div><div class="detail-value">${u.alamat||'-'}</div></div>
+                            <div class="detail-item"><div class="detail-label">Role</div><div class="detail-value">${u.nama_role}</div></div>
+                            <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${statusText}</div></div>
+                            <div class="detail-item"><div class="detail-label">Dibuat Pada</div><div class="detail-value">${u.created_at}</div></div>
+                        `;
+                        document.getElementById('detailModal').classList.add('show');
+                    }
+                });
+        }
+        
+        function closeModal(id){
+            document.getElementById(id).classList.remove('show');
+        }
+        
+        function toggleStatus(id, currentStatus){
+            var action = (currentStatus == 1) ? 'nonaktifkan' : 'aktifkan';
+            if(confirm('Yakin ingin ' + action + ' user ini?')) {
+                window.location.href = 'users.php?toggle=' + id;
             }
-        });
-}
+        }
         
-        function closeModal(id){document.getElementById(id).classList.remove('show');}
-        
-     function toggleStatus(id, currentStatus){
-    var action = (currentStatus == 1) ? 'nonaktifkan' : 'aktifkan';
-    if(confirm('Yakin ingin ' + action + ' user ini?')) {
-        window.location.href = 'users.php?toggle=' + id;
-    }
-}
-        
-        function confirmDelete(id,nama){
-            if(confirm(`Yakin ingin menghapus user "${nama}"?`)) window.location.href=`users.php?hapus=${id}`;
+        function confirmDelete(id, nama){
+            if(confirm(`Yakin ingin menghapus user "${nama}"?`)) {
+                window.location.href = `users.php?hapus=${id}`;
+            }
         }
         
         window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) event.target.classList.remove('show');
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
         }
     </script>
 </body>

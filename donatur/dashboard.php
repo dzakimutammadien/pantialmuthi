@@ -425,6 +425,10 @@ $recentDonasi = query($queryRecent);
                 <i class="fas fa-hand-holding-heart"></i>
                 <span>Donasi Sekarang</span>
             </div>
+              <div class="menu-item" onclick="location.href='../semua_program.php'">
+        <i class="fas fa-chalkboard-user"></i>
+        <span>Program Donasi</span>
+    </div>
             <div class="menu-item" onclick="location.href='histori.php'">
                 <i class="fas fa-history"></i>
                 <span>Riwayat Donasi</span>
@@ -439,7 +443,7 @@ $recentDonasi = query($queryRecent);
             </div>
             <div class="menu-item" onclick="location.href='laporan.php'">
                 <i class="fas fa-chart-line"></i>
-                <span>Laporan</span>
+                <span>Laporan Keuangan</span>
             </div>
             <div class="menu-item" onclick="location.href='perkembangan.php'">
     <i class="fas fa-seedling"></i>

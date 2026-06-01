@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: donatur/histori.php
 // HALAMAN RIWAYAT DONASI UNTUK DONATUR
+// (MENAMPILKAN DONASI BIASA + DONASI PROGRAM)
 // ======================================================
 
 require_once '../config/database.php';
@@ -17,27 +18,42 @@ $currentUser = getCurrentUser();
 // ======================================================
 if (isset($_GET['hapus'])) {
     $id = (int)$_GET['hapus'];
+    $tipe = isset($_GET['tipe']) ? $_GET['tipe'] : 'biasa';
     
-    // Cek kepemilikan dan status
-    $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi WHERE id = $id AND user_id = " . $currentUser['id']);
-    $data = mysqli_fetch_assoc($check);
-    
-    if ($data) {
-        if (in_array($data['status'], ['pending', 'failed'])) {
-            // Hapus file bukti transfer
+    if ($tipe == 'biasa') {
+        // Hapus donasi biasa
+        $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi WHERE id = $id AND user_id = " . $currentUser['id']);
+        $data = mysqli_fetch_assoc($check);
+        
+        if ($data && in_array($data['status'], ['pending', 'failed'])) {
             if ($data['bukti_transfer'] && file_exists('../assets/uploads/bukti_transfer/' . $data['bukti_transfer'])) {
                 unlink('../assets/uploads/bukti_transfer/' . $data['bukti_transfer']);
             }
-            
             $sql = "DELETE FROM donasi WHERE id = $id";
             if (mysqli_query($conn, $sql)) {
-                logActivity($currentUser['id'], "Menghapus donasi ID: $id");
+                logActivity($currentUser['id'], "Menghapus donasi biasa ID: $id");
                 $_SESSION['success'] = "Donasi berhasil dihapus!";
             } else {
                 $_SESSION['error'] = "Gagal menghapus donasi!";
             }
         } else {
             $_SESSION['error'] = "Donasi yang sudah sukses tidak bisa dihapus!";
+        }
+    } else {
+        // Hapus donasi program
+        $check = mysqli_query($conn, "SELECT status FROM donasi_program WHERE id = $id AND user_id = " . $currentUser['id']);
+        $data = mysqli_fetch_assoc($check);
+        
+        if ($data && in_array($data['status'], ['pending', 'failed'])) {
+            $sql = "DELETE FROM donasi_program WHERE id = $id";
+            if (mysqli_query($conn, $sql)) {
+                logActivity($currentUser['id'], "Menghapus donasi program ID: $id");
+                $_SESSION['success'] = "Donasi program berhasil dihapus!";
+            } else {
+                $_SESSION['error'] = "Gagal menghapus donasi program!";
+            }
+        } else {
+            $_SESSION['error'] = "Donasi program yang sudah sukses tidak bisa dihapus!";
         }
     }
     header("Location: histori.php");
@@ -48,62 +64,80 @@ if (isset($_GET['hapus'])) {
 // FILTER & PAGINATION
 // ======================================================
 $search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
-$filter_kategori = isset($_GET['kategori']) ? (int)$_GET['kategori'] : '';
+$filter_tipe = isset($_GET['tipe']) ? mysqli_real_escape_string($conn, $_GET['tipe']) : '';
 $filter_status = isset($_GET['status']) ? mysqli_real_escape_string($conn, $_GET['status']) : '';
 $filter_periode = isset($_GET['periode']) ? mysqli_real_escape_string($conn, $_GET['periode']) : '';
 
-$where = "WHERE d.user_id = " . $currentUser['id'];
+// Query untuk donasi biasa + donasi program
+$where = "WHERE 1=1";
 
-if ($search != '') {
-    $where .= " AND (d.keterangan LIKE '%$search%' OR k.nama_kategori LIKE '%$search%')";
-}
-if ($filter_kategori != '' && $filter_kategori > 0) {
-    $where .= " AND d.kategori_id = $filter_kategori";
-}
-if ($filter_status != '' && $filter_status != 'semua') {
-    $where .= " AND d.status = '$filter_status'";
-}
-if ($filter_periode != '' && $filter_periode != 'semua') {
-    switch ($filter_periode) {
-        case 'hari_ini':
-            $where .= " AND DATE(d.tanggal_donasi) = CURDATE()";
-            break;
-        case 'minggu_ini':
-            $where .= " AND YEARWEEK(d.tanggal_donasi, 1) = YEARWEEK(CURDATE(), 1)";
-            break;
-        case 'bulan_ini':
-            $where .= " AND MONTH(d.tanggal_donasi) = MONTH(CURDATE()) AND YEAR(d.tanggal_donasi) = YEAR(CURDATE())";
-            break;
+if ($filter_tipe != '' && $filter_tipe != 'semua') {
+    if ($filter_tipe == 'biasa') {
+        $where .= " AND tipe = 'biasa'";
+    } elseif ($filter_tipe == 'program') {
+        $where .= " AND tipe = 'program'";
     }
 }
 
+// Search tidak bisa langsung karena UNION, jadi setelah query
 $limit = 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
+// Ambil donasi biasa
+$sql_biasa = "SELECT 
+                'biasa' as tipe,
+                d.id,
+                d.tanggal_donasi as tanggal,
+                k.nama_kategori as kategori,
+                d.nominal,
+                d.status,
+                d.keterangan,
+                d.bukti_transfer,
+                d.catatan_doa,
+                NULL as program_nama,
+                NULL as pesan
+              FROM donasi d
+              JOIN kategori_donasi k ON d.kategori_id = k.id
+              WHERE d.user_id = " . $currentUser['id'];
+
+// Ambil donasi program
+$sql_program = "SELECT 
+                'program' as tipe,
+                dp.id,
+                dp.created_at as tanggal,
+                p.nama_program as kategori,
+                dp.nominal,
+                dp.status,
+                dp.pesan as keterangan,
+                dp.bukti_transfer,
+                NULL as catatan_doa,
+                p.nama_program as program_nama,
+                dp.pesan
+              FROM donasi_program dp
+              JOIN program_donasi p ON dp.program_id = p.id
+              WHERE dp.user_id = " . $currentUser['id'];
+
+// Gabungkan
+$sql = "SELECT * FROM ($sql_biasa UNION ALL $sql_program) as riwayat $where ORDER BY tanggal DESC";
+$all_riwayat = query($sql);
+
 // Total data untuk pagination
-$total_sql = "SELECT COUNT(*) as total FROM donasi d 
-              JOIN kategori_donasi k ON d.kategori_id = k.id 
-              $where";
-$total_result = mysqli_query($conn, $total_sql);
-$total_rows = mysqli_fetch_assoc($total_result)['total'];
+$total_rows = count($all_riwayat);
 $total_pages = ceil($total_rows / $limit);
 
-// Ambil data donasi
-$sql = "SELECT d.*, k.nama_kategori 
-        FROM donasi d 
-        JOIN kategori_donasi k ON d.kategori_id = k.id 
-        $where 
-        ORDER BY d.tanggal_donasi DESC 
-        LIMIT $offset, $limit";
-$donasiList = query($sql);
+// Ambil data per halaman
+$riwayat = array_slice($all_riwayat, $offset, $limit);
 
-// Hitung total donasi yang sukses
-$total_sukses_sql = "SELECT SUM(nominal) as total FROM donasi WHERE user_id = " . $currentUser['id'] . " AND status = 'success'";
+// Hitung total donasi sukses (biasa + program)
+$total_sukses_sql = "SELECT 
+                        (SELECT COALESCE(SUM(nominal), 0) FROM donasi WHERE user_id = " . $currentUser['id'] . " AND status = 'success') +
+                        (SELECT COALESCE(SUM(nominal), 0) FROM donasi_program WHERE user_id = " . $currentUser['id'] . " AND status = 'success')
+                     as total";
 $total_sukses_result = mysqli_query($conn, $total_sukses_sql);
 $totalDonasiSukses = mysqli_fetch_assoc($total_sukses_result)['total'] ?? 0;
 
-// Ambil kategori untuk filter
+// Ambil kategori untuk filter (donasi biasa)
 $kategoris = query("SELECT * FROM kategori_donasi WHERE tipe IN ('donasi', 'both') ORDER BY nama_kategori ASC");
 
 $success = $_SESSION['success'] ?? '';
@@ -158,36 +192,29 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
         .btn-filter { background: #50c878; color: white; }
         .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
-        .btn-export-pdf {
-    background: #dc3545;
-    color: white;
-    padding: 8px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 14px;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    font-family: inherit;
-}
         
         /* TABLE */
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
+        .table-wrapper { overflow-x: auto; width: 100%; }
+        table { width: 100%; min-width: 800px; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; vertical-align: middle; }
+        th { background: #f8f9fa; font-size: 13px; font-weight: 600; color: #666; }
+        td { border-bottom: 1px solid #eee; font-size: 13px; color: #555; }
+        td:last-child { white-space: nowrap; }
+        
+        .badge-tipe-biasa { background: #e3f2fd; color: #2196f3; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-tipe-program { background: #f3e5f5; color: #9c27b0; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
         .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3e0; color: #ff9800; }
         .status-success { background: #e8f5e9; color: #4caf50; }
         .status-failed { background: #ffebee; color: #f44336; }
-        .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; }
+        
+        .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; display: inline-block; white-space: nowrap; }
         .btn-detail { background: #17a2b8; color: white; }
         .btn-edit { background: #50c878; color: white; }
         .btn-delete { background: #dc3545; color: white; }
         
         /* PAGINATION */
-        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
+        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
         .pagination a, .pagination span { padding: 8px 14px; border-radius: 8px; text-decoration: none; }
         .pagination a { background: #f0f2f5; color: #555; }
         .pagination .active { background: #50c878; color: white; }
@@ -195,15 +222,22 @@ unset($_SESSION['success'], $_SESSION['error']);
         /* MODAL */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 20px; width: 500px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; border-radius: 20px; width: 550px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .close-modal { font-size: 24px; cursor: pointer; }
         .detail-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .detail-label { font-weight: 600; font-size: 12px; color: #888; margin-bottom: 5px; }
         .detail-value { font-size: 14px; color: #333; }
         .detail-image { text-align: center; margin: 15px 0; }
-        .detail-image img { max-width: 200px; border-radius: 10px; }
+        .detail-image img { max-width: 100%; max-height: 200px; border-radius: 10px; }
+        .modal-footer { display: flex; justify-content: flex-end; margin-top: 20px; }
         .btn-cancel { background: #6c757d; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; }
+        
+        /* ALERT */
+        .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
+        .alert-error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
+        
         .total-info { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; text-align: right; }
         .total-info span { font-weight: 700; font-size: 18px; color: #50c878; }
         
@@ -221,8 +255,9 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Beranda</span></div>
             <div class="menu-item" onclick="location.href='donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
             <div class="menu-item active" onclick="location.href='histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
-            <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-            <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khususon Do'a</span></div>
+            <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Laporan Pengeluaran</span></div>
+            <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
+            <div class="menu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
             <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
         </div>
     </div>
@@ -232,7 +267,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         <div class="topbar">
             <div class="page-title">
                 <h2>Riwayat Donasi</h2>
-                <p>Histori donasi yang telah Anda lakukan</p>
+                <p>Histori donasi yang telah Anda lakukan (donasi biasa & program)</p>
             </div>
             <div class="profile-dropdown">
                 <div class="profile-icon"><i class="fas fa-cog"></i></div>
@@ -254,17 +289,10 @@ unset($_SESSION['success'], $_SESSION['error']);
             <!-- FILTER -->
             <form method="GET" action="" class="filter-section">
                 <input type="text" name="search" placeholder="Cari kategori atau keterangan..." value="<?php echo htmlspecialchars($search); ?>">
-                <select name="periode">
-                    <option value="semua">Semua Periode</option>
-                    <option value="hari_ini" <?php echo $filter_periode == 'hari_ini' ? 'selected' : ''; ?>>Hari Ini</option>
-                    <option value="minggu_ini" <?php echo $filter_periode == 'minggu_ini' ? 'selected' : ''; ?>>Minggu Ini</option>
-                    <option value="bulan_ini" <?php echo $filter_periode == 'bulan_ini' ? 'selected' : ''; ?>>Bulan Ini</option>
-                </select>
-                <select name="kategori">
-                    <option value="">Semua Kategori</option>
-                    <?php foreach ($kategoris as $k): ?>
-                        <option value="<?php echo $k['id']; ?>" <?php echo $filter_kategori == $k['id'] ? 'selected' : ''; ?>><?php echo $k['nama_kategori']; ?></option>
-                    <?php endforeach; ?>
+                <select name="tipe">
+                    <option value="semua">Semua Tipe</option>
+                    <option value="biasa" <?php echo $filter_tipe == 'biasa' ? 'selected' : ''; ?>>Donasi Biasa</option>
+                    <option value="program" <?php echo $filter_tipe == 'program' ? 'selected' : ''; ?>>Donasi Program</option>
                 </select>
                 <select name="status">
                     <option value="semua">Semua Status</option>
@@ -274,9 +302,6 @@ unset($_SESSION['success'], $_SESSION['error']);
                 </select>
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Filter</button>
                 <a href="histori.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
-                   <a href="export_histori_pdf.php" class="btn-export-pdf" target="_blank">
-        <i class="fas fa-file-pdf"></i> Export PDF
-    </a>
             </form>
             
             <!-- TABLE -->
@@ -284,49 +309,54 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Tanggal</th>
-                            <th>Kategori Donasi</th>
+                            <th>Tipe</th>
+                            <th>Kategori/Program</th>
                             <th>Keterangan</th>
                             <th>Nominal</th>
-                            <th>Status Donasi</th>
+                            <th>Status</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (count($donasiList) > 0): $no = $offset + 1; foreach ($donasiList as $d): ?>
+                        <?php if (count($riwayat) > 0): $no = $offset + 1; foreach ($riwayat as $r): ?>
                             <?php 
                                 $statusClass = '';
                                 $statusText = '';
-                                if ($d['status'] == 'pending') {
+                                if ($r['status'] == 'pending') {
                                     $statusClass = 'status-pending';
                                     $statusText = 'Menunggu';
-                                } elseif ($d['status'] == 'success') {
+                                } elseif ($r['status'] == 'success') {
                                     $statusClass = 'status-success';
                                     $statusText = 'Sukses';
                                 } else {
                                     $statusClass = 'status-failed';
                                     $statusText = 'Tidak Valid';
                                 }
-                                $canEditDelete = in_array($d['status'], ['pending', 'failed']);
+                                $tipeClass = ($r['tipe'] == 'biasa') ? 'badge-tipe-biasa' : 'badge-tipe-program';
+                                $tipeText = ($r['tipe'] == 'biasa') ? '💝 Donasi Biasa' : '📦 Donasi Program';
+                                $canEditDelete = in_array($r['status'], ['pending', 'failed']);
                             ?>
                             <tr>
-                                <td><?php echo $d['id']; ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($d['tanggal_donasi'])); ?></td>
-                                <td><?php echo htmlspecialchars($d['nama_kategori']); ?></td>
-                                <td><?php echo htmlspecialchars($d['keterangan']) ?: '-'; ?></td>
-                                <td>Rp <?php echo number_format($d['nominal'], 0, ',', '.'); ?></td>
+                                <td><?php echo date('d/m/Y H:i', strtotime($r['tanggal'])); ?></td>
+                                <td><span class="<?php echo $tipeClass; ?>"><?php echo $tipeText; ?></span></td>
+                                <td><?php echo htmlspecialchars($r['kategori']); ?></td>
+                                <td><?php echo htmlspecialchars(substr($r['keterangan'] ?: '-', 0, 50)) . (strlen($r['keterangan']) > 50 ? '...' : ''); ?></td>
+                                <td>Rp <?php echo number_format($r['nominal'], 0, ',', '.'); ?></td>
                                 <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
                                 <td>
-                                    <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $d['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
+                                    <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-info-circle"></i> Detail</button>
                                     <?php if ($canEditDelete): ?>
-                                        <button class="btn-action btn-edit" onclick="location.href='edit_donasi.php?id=<?php echo $d['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
-                                        <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $d['id']; ?>)"><i class="fas fa-trash"></i> Hapus</button>
+                                        <?php if ($r['tipe'] == 'biasa'): ?>
+                                            <button class="btn-action btn-edit" onclick="location.href='edit_donasi.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
+                                        <?php endif; ?>
+                                        <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-trash"></i> Hapus</button>
                                     <?php endif; ?>
-                                </td>
-                            </tr>
+                                        </td>
+                                        </tr>
                         <?php endforeach; else: ?>
-                            <tr><td colspan="7" style="text-align:center; padding:40px;">Belum ada data donasi</td></tr>
+                            <tr><td colspan="7" style="text-align:center; padding:40px;">Belum ada data donasi</td>^?
+
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -336,17 +366,17 @@ unset($_SESSION['success'], $_SESSION['error']);
             <?php if ($total_pages > 1): ?>
             <div class="pagination">
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?php echo $page-1; ?>&search=<?php echo $search; ?>&periode=<?php echo $filter_periode; ?>&kategori=<?php echo $filter_kategori; ?>&status=<?php echo $filter_status; ?>">« Sebelumnya</a>
+                    <a href="?page=<?php echo $page-1; ?>&search=<?php echo $search; ?>&tipe=<?php echo $filter_tipe; ?>&status=<?php echo $filter_status; ?>">« Sebelumnya</a>
                 <?php endif; ?>
                 <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                     <?php if ($i == $page): ?>
                         <span class="active"><?php echo $i; ?></span>
                     <?php else: ?>
-                        <a href="?page=<?php echo $i; ?>&search=<?php echo $search; ?>&periode=<?php echo $filter_periode; ?>&kategori=<?php echo $filter_kategori; ?>&status=<?php echo $filter_status; ?>"><?php echo $i; ?></a>
+                        <a href="?page=<?php echo $i; ?>&search=<?php echo $search; ?>&tipe=<?php echo $filter_tipe; ?>&status=<?php echo $filter_status; ?>"><?php echo $i; ?></a>
                     <?php endif; ?>
                 <?php endfor; ?>
                 <?php if ($page < $total_pages): ?>
-                    <a href="?page=<?php echo $page+1; ?>&search=<?php echo $search; ?>&periode=<?php echo $filter_periode; ?>&kategori=<?php echo $filter_kategori; ?>&status=<?php echo $filter_status; ?>">Selanjutnya »</a>
+                    <a href="?page=<?php echo $page+1; ?>&search=<?php echo $search; ?>&tipe=<?php echo $filter_tipe; ?>&status=<?php echo $filter_status; ?>">Selanjutnya »</a>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
@@ -363,11 +393,11 @@ unset($_SESSION['success'], $_SESSION['error']);
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Detail Donasi</h3>
-                <span class="close-modal" onclick="closeModal()">&times;</span>
+                <span class="close-modal" onclick="closeModal('detailModal')">&times;</span>
             </div>
             <div id="detailContent"></div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeModal()">Tutup</button>
+                <button class="btn-cancel" onclick="closeModal('detailModal')">Tutup</button>
             </div>
         </div>
     </div>
@@ -377,26 +407,33 @@ unset($_SESSION['success'], $_SESSION['error']);
             document.getElementById('detailModal').classList.remove('show');
         }
         
-        function openDetailModal(id) {
-            fetch('get_donasi.php?id=' + id)
+        function openDetailModal(id, tipe) {
+            let url = (tipe == 'biasa') ? 'get_donasi.php?id=' + id : 'get_donasi_program.php?id=' + id;
+            
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         let d = data.data;
-                        let statusClass = d.status == 'pending' ? 'status-pending' : (d.status == 'success' ? 'status-success' : 'status-failed');
                         let statusText = d.status == 'pending' ? 'Menunggu' : (d.status == 'success' ? 'Sukses' : 'Tidak Valid');
+                        let statusClass = d.status == 'pending' ? 'status-pending' : (d.status == 'success' ? 'status-success' : 'status-failed');
                         let imageHtml = d.bukti_transfer ? `<div class="detail-image"><img src="../assets/uploads/bukti_transfer/${d.bukti_transfer}" onclick="window.open(this.src)"></div>` : '<div class="detail-image"><p>Tidak ada bukti transfer</p></div>';
                         
-                        document.getElementById('detailContent').innerHTML = `
+                        let detailHtml = `
                             <div class="detail-item"><div class="detail-label">ID Donasi</div><div class="detail-value">${d.id}</div></div>
-                            <div class="detail-item"><div class="detail-label">Tanggal Donasi</div><div class="detail-value">${d.tanggal_donasi}</div></div>
-                            <div class="detail-item"><div class="detail-label">Kategori</div><div class="detail-value">${d.nama_kategori}</div></div>
+                            <div class="detail-item"><div class="detail-label">Tanggal Donasi</div><div class="detail-value">${d.tanggal_donasi || d.created_at}</div></div>
+                            <div class="detail-item"><div class="detail-label">Kategori/Program</div><div class="detail-value">${d.nama_kategori || d.nama_program}</div></div>
                             <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.nominal)}</div></div>
-                            <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${d.keterangan || '-'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Catatan Doa</div><div class="detail-value">${d.catatan_doa || '-'}</div></div>
+                            <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${d.keterangan || d.pesan || '-'}</div></div>
                             <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>
                             ${imageHtml}
                         `;
+                        
+                        if (tipe == 'biasa' && d.catatan_doa) {
+                            detailHtml += `<div class="detail-item"><div class="detail-label">Catatan Doa</div><div class="detail-value">${d.catatan_doa}</div></div>`;
+                        }
+                        
+                        document.getElementById('detailContent').innerHTML = detailHtml;
                         document.getElementById('detailModal').classList.add('show');
                     } else {
                         alert('Gagal mengambil data donasi');
@@ -408,9 +445,9 @@ unset($_SESSION['success'], $_SESSION['error']);
                 });
         }
         
-        function confirmDelete(id) {
+        function confirmDelete(id, tipe) {
             if (confirm('Apakah Anda yakin ingin menghapus donasi ini? Data yang dihapus tidak dapat dikembalikan.')) {
-                window.location.href = 'histori.php?hapus=' + id;
+                window.location.href = 'histori.php?hapus=' + id + '&tipe=' + tipe;
             }
         }
         
