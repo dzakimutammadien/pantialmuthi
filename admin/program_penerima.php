@@ -1,7 +1,7 @@
 <?php
 // ======================================================
 // FILE: admin/program_penerima.php
-// HALAMAN KELOLA PENERIMA MANFAAT PER PROGRAM (DENGAN FOTO)
+// HALAMAN KELOLA PENERIMA MANFAAT PER PROGRAM (DENGAN SIDEBAR)
 // ======================================================
 
 require_once '../config/database.php';
@@ -23,16 +23,14 @@ if (count($program) == 0) {
 }
 $program = $program[0];
 
-// ======================================================
-// FUNGSI UPLOAD FOTO PENERIMA
-// ======================================================
+// Fungsi upload foto
 function uploadFotoPenerima($existing_foto = null) {
     if (isset($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
         $ext = pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION);
         $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         
         if (!in_array(strtolower($ext), $allowed)) {
-            return ['success' => false, 'message' => 'Format file tidak diizinkan (JPG, PNG, GIF, WEBP)'];
+            return ['success' => false, 'message' => 'Format file tidak diizinkan'];
         }
         
         $filename = 'penerima_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
@@ -48,11 +46,7 @@ function uploadFotoPenerima($existing_foto = null) {
     return ['success' => true, 'filename' => $existing_foto];
 }
 
-// ======================================================
-// PROSES CRUD PENERIMA MANFAAT
-// ======================================================
-
-// TAMBAH PENERIMA
+// Proses CRUD
 if (isset($_POST['tambah'])) {
     $nama_penerima = mysqli_real_escape_string($conn, $_POST['nama_penerima']);
     $jenis_bantuan = mysqli_real_escape_string($conn, $_POST['jenis_bantuan']);
@@ -60,7 +54,6 @@ if (isset($_POST['tambah'])) {
     $tanggal_penyaluran = mysqli_real_escape_string($conn, $_POST['tanggal_penyaluran']);
     $keterangan = mysqli_real_escape_string($conn, $_POST['keterangan']);
     
-    // Upload foto
     $upload = uploadFotoPenerima();
     $foto = $upload['success'] ? $upload['filename'] : null;
     
@@ -68,7 +61,7 @@ if (isset($_POST['tambah'])) {
             VALUES ($program_id, '$nama_penerima', '$jenis_bantuan', $jumlah, '$tanggal_penyaluran', '$keterangan', '$foto')";
     
     if (mysqli_query($conn, $sql)) {
-        logActivity($currentUser['id'], "Menambah penerima manfaat untuk program: " . $program['nama_program']);
+        logActivity($currentUser['id'], "Menambah penerima manfaat");
         $_SESSION['success'] = "Penerima manfaat berhasil ditambahkan!";
     } else {
         $_SESSION['error'] = "Gagal menambahkan: " . mysqli_error($conn);
@@ -77,7 +70,6 @@ if (isset($_POST['tambah'])) {
     exit();
 }
 
-// EDIT PENERIMA
 if (isset($_POST['edit'])) {
     $id = (int)$_POST['id'];
     $nama_penerima = mysqli_real_escape_string($conn, $_POST['nama_penerima']);
@@ -86,11 +78,8 @@ if (isset($_POST['edit'])) {
     $tanggal_penyaluran = mysqli_real_escape_string($conn, $_POST['tanggal_penyaluran']);
     $keterangan = mysqli_real_escape_string($conn, $_POST['keterangan']);
     
-    // Ambil foto lama
     $query = mysqli_query($conn, "SELECT foto FROM penerima_manfaat WHERE id = $id");
     $old = mysqli_fetch_assoc($query);
-    
-    // Upload foto baru
     $upload = uploadFotoPenerima($old['foto']);
     $foto = $upload['success'] ? $upload['filename'] : $old['foto'];
     
@@ -113,11 +102,8 @@ if (isset($_POST['edit'])) {
     exit();
 }
 
-// HAPUS PENERIMA
 if (isset($_GET['hapus'])) {
     $id = (int)$_GET['hapus'];
-    
-    // Ambil foto untuk dihapus
     $query = mysqli_query($conn, "SELECT foto FROM penerima_manfaat WHERE id = $id");
     $foto = mysqli_fetch_assoc($query)['foto'];
     
@@ -135,9 +121,7 @@ if (isset($_GET['hapus'])) {
     exit();
 }
 
-// Ambil data penerima manfaat
-$sql_penerima = "SELECT * FROM penerima_manfaat WHERE program_id = $program_id ORDER BY tanggal_penyaluran DESC";
-$penerima_list = query($sql_penerima);
+$penerima_list = query("SELECT * FROM penerima_manfaat WHERE program_id = $program_id ORDER BY tanggal_penyaluran DESC");
 
 $success = $_SESSION['success'] ?? '';
 $error = $_SESSION['error'] ?? '';
@@ -154,12 +138,44 @@ unset($_SESSION['success'], $_SESSION['error']);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Poppins', sans-serif; background: #f0f2f5; }
+        body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
         
-        .container { max-width: 1200px; margin: 20px auto; padding: 20px; }
+        /* SIDEBAR */
+        .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; z-index: 100; }
+        .sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; justify-content: center; }
+        .sidebar-logo { width: 45px; height: 45px; object-fit: contain; }
+        .sidebar-header h3 { font-size: 16px; margin-bottom: 3px; }
+        .sidebar-header p { font-size: 11px; opacity: 0.7; }
+        .sidebar-menu { padding: 20px 0; }
+        .menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.8); transition: all 0.3s; }
+        .menu-item:hover, .menu-item.active { background: rgba(80,200,120,0.3); border-left: 4px solid #50c878; }
+        .menu-item i { width: 24px; font-size: 18px; }
+        .menu-item span { font-size: 14px; }
+        .submenu { padding-left: 56px; max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+        .submenu.open { max-height: 300px; }
+        .submenu-item { padding: 10px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: rgba(255,255,255,0.7); font-size: 13px; }
+        .submenu-item:hover { color: #50c878; padding-left: 25px; }
+        .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
+        .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
+        
+        /* MAIN CONTENT */
+        .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
+        
+        /* TOPBAR */
+        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .page-title h2 { font-size: 20px; color: #333; }
+        .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
+        .profile-dropdown { position: relative; }
+        .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: white; }
+        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 1000; }
+        .profile-dropdown:hover .dropdown-menu { opacity: 1; visibility: visible; }
+        .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
+        .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
+        
+        /* CONTENT */
+        .container { max-width: 1200px; margin: 0 auto; }
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 25px; }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
-        h2 { color: #333; }
         .btn-back { background: #6c757d; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-tambah { background: #50c878; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; }
         
@@ -187,67 +203,115 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-save { background: #50c878; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
         .btn-cancel { background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
         
-        @media (max-width: 768px) { .container { margin: 10px; } table { font-size: 12px; } }
+        @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h2><i class="fas fa-users"></i> Penerima Manfaat</h2>
-                    <p>Program: <strong><?php echo $program['nama_program']; ?></strong></p>
-                </div>
-                <div>
-                    <a href="program.php" class="btn-back"><i class="fas fa-arrow-left"></i> Kembali</a>
-                    <button class="btn-tambah" onclick="openTambahModal()"><i class="fas fa-plus"></i> Tambah Penerima</button>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <img src="../assets/image/almuthi.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
+            <div><h3>Panti Asuhan</h3><p>Al-Muthi</p></div>
+        </div>
+        <div class="sidebar-menu">
+            <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
+            <div class="menu-item" onclick="location.href='users.php'"><i class="fas fa-users"></i><span>Manajemen User</span></div>
+            <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-exchange-alt"></i><span>Transaksi</span><i class="fas fa-chevron-down arrow"></i></div>
+            <div class="submenu">
+                <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
+                <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+                <div class="submenu-item" onclick="location.href='verifikasi_program.php'"><i class="fas fa-chalkboard-user"></i><span>Verifikasi Program</span></div>
+                <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+            </div>
+            <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
+            <div class="submenu open">
+                <div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div>
+                <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
+                <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
+                <div class="submenu-item" onclick="location.href='program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
+                <div class="submenu-item" onclick="location.href='galeri.php'"><i class="fas fa-images"></i><span>Galeri</span></div>
+                <div class="submenu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
+                <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <div class="topbar">
+            <div class="page-title">
+                <h2>Penerima Manfaat</h2>
+                <p>Program: <?php echo $program['nama_program']; ?></p>
+            </div>
+            <div class="profile-dropdown">
+                <div class="profile-icon"><i class="fas fa-cog"></i></div>
+                <div class="dropdown-menu">
+                    <a href="profil.php"><i class="fas fa-user-circle"></i> Profil</a>
+                    <a href="log_aktivitas.php"><i class="fas fa-history"></i> Log Aktivitas</a>
+                    <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
             </div>
-            
-            <?php if ($success): ?>
-                <div class="alert alert-success"><?php echo $success; ?></div>
-            <?php endif; ?>
-            <?php if ($error): ?>
-                <div class="alert alert-error"><?php echo $error; ?></div>
-            <?php endif; ?>
-            
-            <table>
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Foto</th>
-                        <th>Nama Penerima</th>
-                        <th>Jenis Bantuan</th>
-                        <th>Jumlah</th>
-                        <th>Tanggal Penyaluran</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (count($penerima_list) > 0): $no = 1; foreach ($penerima_list as $p): ?>
-                        <tr>
-                            <td><?php echo $no++; ?></td>
-                            <td>
-                                <?php if ($p['foto']): ?>
-                                    <img src="../assets/uploads/penerima/<?php echo $p['foto']; ?>" class="foto-thumb" onerror="this.src='../assets/image/almuthi.png'">
-                                <?php else: ?>
-                                    <i class="fas fa-user-circle" style="font-size: 32px; color: #ccc;"></i>
-                                <?php endif; ?>
-                                </td>
-                            <td><?php echo htmlspecialchars($p['nama_penerima']); ?></td>
-                            <td><?php echo htmlspecialchars($p['jenis_bantuan']); ?></td>
-                            <td>Rp <?php echo number_format($p['jumlah'], 0, ',', '.'); ?></td>
-                            <td><?php echo date('d/m/Y', strtotime($p['tanggal_penyaluran'])); ?></td>
-                            <td>
-                                <button class="btn-action btn-edit" onclick="openEditModal(<?php echo $p['id']; ?>)"><i class="fas fa-edit"></i> Edit</button>
-                                <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i> Hapus</button>
-                                </td>
-                                </tr>
-                    <?php endforeach; else: ?>
-                        <tr><td colspan="7" style="text-align:center;">Belum ada penerima manfaat</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+        </div>
+        
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2><i class="fas fa-users"></i> Penerima Manfaat</h2>
+                    </div>
+                    <div>
+                        <a href="program.php" class="btn-back"><i class="fas fa-arrow-left"></i> Kembali</a>
+                        <button class="btn-tambah" onclick="openTambahModal()"><i class="fas fa-plus"></i> Tambah Penerima</button>
+                    </div>
+                </div>
+                
+                <?php if ($success): ?>
+                    <div class="alert alert-success"><?php echo $success; ?></div>
+                <?php endif; ?>
+                <?php if ($error): ?>
+                    <div class="alert alert-error"><?php echo $error; ?></div>
+                <?php endif; ?>
+                
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Foto</th>
+                                <th>Nama Penerima</th>
+                                <th>Jenis Bantuan</th>
+                                <th>Jumlah</th>
+                                <th>Tanggal Penyaluran</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (count($penerima_list) > 0): $no = 1; foreach ($penerima_list as $p): ?>
+                                <tr>
+                                    <td><?php echo $no++; ?></td>
+                                    <td>
+                                        <?php if ($p['foto']): ?>
+                                            <img src="../assets/uploads/penerima/<?php echo $p['foto']; ?>" class="foto-thumb" onerror="this.src='../assets/image/almuthi.png'">
+                                        <?php else: ?>
+                                            <i class="fas fa-user-circle" style="font-size: 32px; color: #ccc;"></i>
+                                        <?php endif; ?>
+                                        </td>
+                                    <td><?php echo htmlspecialchars($p['nama_penerima']); ?></td>
+                                    <td><?php echo htmlspecialchars($p['jenis_bantuan']); ?></td>
+                                    <td>Rp <?php echo number_format($p['jumlah'], 0, ',', '.'); ?></td>
+                                    <td><?php echo date('d/m/Y', strtotime($p['tanggal_penyaluran'])); ?></td>
+                                    <td>
+                                        <button class="btn-action btn-edit" onclick="openEditModal(<?php echo $p['id']; ?>)"><i class="fas fa-edit"></i> Edit</button>
+                                        <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i> Hapus</button>
+                                        </td>
+                                        </tr>
+                            <?php endforeach; else: ?>
+                                <tr><td colspan="7" style="text-align:center;">Belum ada penerima manfaat</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -281,7 +345,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="form-group"><label>Tanggal Penyaluran</label><input type="date" name="tanggal_penyaluran" id="edit_tanggal" required></div>
                 <div class="form-group"><label>Keterangan</label><textarea name="keterangan" id="edit_keterangan" rows="2"></textarea></div>
                 <div class="form-group"><label>Ganti Foto</label><input type="file" name="foto" accept="image/*">
-                    <small style="color:#888;">Kosongkan jika tidak ingin mengganti foto</small>
+                    <small style="color:#888;">Kosongkan jika tidak ingin mengganti</small>
                 </div>
                 <div id="edit_current_foto" class="form-group" style="text-align:center;"></div>
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('editModal')">Batal</button><button type="submit" name="edit" class="btn-save">Simpan</button></div>
@@ -290,8 +354,8 @@ unset($_SESSION['success'], $_SESSION['error']);
     </div>
     
     <script>
+        function toggleSubmenu(e){e.classList.toggle('open');let s=e.nextElementSibling;if(s&&s.classList.contains('submenu'))s.classList.toggle('open');}
         function closeModal(id){document.getElementById(id).classList.remove('show');}
-        
         function openTambahModal(){document.getElementById('tambahModal').classList.add('show');}
         
         function openEditModal(id){
@@ -305,11 +369,8 @@ unset($_SESSION['success'], $_SESSION['error']);
                         document.getElementById('edit_jumlah').value = d.data.jumlah;
                         document.getElementById('edit_tanggal').value = d.data.tanggal_penyaluran;
                         document.getElementById('edit_keterangan').value = d.data.keterangan || '';
-                        
                         if(d.data.foto){
                             document.getElementById('edit_current_foto').innerHTML = '<label>Foto Saat Ini</label><br><img src="../assets/uploads/penerima/'+d.data.foto+'" width="80" height="80" style="border-radius:50%; object-fit:cover;">';
-                        } else {
-                            document.getElementById('edit_current_foto').innerHTML = '';
                         }
                         document.getElementById('editModal').classList.add('show');
                     }

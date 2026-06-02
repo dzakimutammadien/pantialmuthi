@@ -70,7 +70,20 @@ if (isset($_POST['update_verifikasi'])) {
     header("Location: verifikasi_program.php");
     exit();
 }
-
+// HAPUS DONASI PROGRAM
+if (isset($_GET['hapus'])) {
+    $id = (int)$_GET['hapus'];
+    
+    $sql = "DELETE FROM donasi_program WHERE id = $id";
+    if (mysqli_query($conn, $sql)) {
+        logActivity($currentUser['id'], "Menghapus donasi program ID: $id");
+        $_SESSION['success'] = "Donasi program berhasil dihapus!";
+    } else {
+        $_SESSION['error'] = "Gagal menghapus: " . mysqli_error($conn);
+    }
+    header("Location: verifikasi_program.php");
+    exit();
+}
 // ======================================================
 // FILTER & PAGINATION
 // ======================================================
@@ -104,7 +117,7 @@ $sql = "SELECT dp.*, p.nama_program, u.nama_lengkap as verified_by_nama
         JOIN program_donasi p ON dp.program_id = p.id 
         LEFT JOIN users u ON dp.verified_by = u.id 
         $where 
-        ORDER BY dp.created_at DESC 
+        ORDER BY dp.created_at ASC
         LIMIT $offset, $limit";
 $donasiList = query($sql);
 
@@ -168,7 +181,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
         .btn-filter { background: #50c878; color: white; }
         .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
-        
+        .btn-delete { background: #dc3545; color: white; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
         td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
@@ -327,6 +340,9 @@ unset($_SESSION['success'], $_SESSION['error']);
                                 <?php else: ?>
                                     <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $d['id']; ?>)"><i class="fas fa-edit"></i> Edit</button>
                                 <?php endif; ?>
+                                <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $d['id']; ?>)"><i class="fas fa-trash"></i> Hapus</button>
+    <!-- SAMPAI SINI -->
+</td>
                                 </td>
                                 </td>
                         <?php endforeach; else: ?>
@@ -432,7 +448,11 @@ unset($_SESSION['success'], $_SESSION['error']);
                 }
             });
         }
-        
+        function confirmDelete(id) {
+    if (confirm('Yakin ingin menghapus donasi program ini? Data yang dihapus tidak dapat dikembalikan.')) {
+        window.location.href = 'verifikasi_program.php?hapus=' + id;
+    }
+}
         function openEditVerifikasiModal(id){
             fetch('get_donasi_program.php?id='+id).then(r=>r.json()).then(d=>{
                 if(d.success){

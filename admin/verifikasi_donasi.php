@@ -108,7 +108,7 @@ $sql = "SELECT d.*, u.nama_lengkap, u.username, k.nama_kategori,
         JOIN kategori_donasi k ON d.kategori_id = k.id 
         LEFT JOIN users v ON d.verified_by = v.id 
         $where 
-        ORDER BY d.tanggal_donasi DESC 
+        ORDER BY d.tanggal_donasi ASC 
         LIMIT $offset, $limit";
 $donasiList = query($sql);
 

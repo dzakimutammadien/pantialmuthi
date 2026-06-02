@@ -105,7 +105,7 @@ $sql = "SELECT p.*, u.nama_lengkap as pengasuh_nama, k.nama_kategori,
         JOIN kategori_donasi k ON p.kategori_id = k.id 
         LEFT JOIN users v ON p.verified_by = v.id 
         $where 
-        ORDER BY p.created_at DESC 
+        ORDER BY p.created_at ASC 
         LIMIT $offset, $limit";
 $pengeluarans = query($sql);
 
