@@ -55,6 +55,11 @@ $queryDoaPending = "SELECT COUNT(*) as total FROM doa WHERE status_doa = 'pendin
 $resultDoaPending = mysqli_query($conn, $queryDoaPending);
 $totalDoaPending = mysqli_fetch_assoc($resultDoaPending)['total'];
 
+// Menunggu Verifikasi Donasi Program (Crowdfunding)
+$queryProgramPending = "SELECT COUNT(*) as total FROM donasi_program WHERE status = 'pending'";
+$resultProgramPending = mysqli_query($conn, $queryProgramPending);
+$totalProgramPending = mysqli_fetch_assoc($resultProgramPending)['total'] ?? 0;
+
 // Ambil donasi terbaru untuk tabel
 $queryRecent = "SELECT d.*, u.nama_lengkap, k.nama_kategori 
                 FROM donasi d 
@@ -418,14 +423,15 @@ $recentDonasi = query($queryRecent);
                     <i class="fas fa-money-bill-wave"></i>
                     <span>Pengeluaran Panti</span>
                 </div>
+                 <div class="submenu-item" onclick="location.href='verifikasi_program.php'">
+    <i class="fas fa-heart"></i>
+    <span>Verifikasi Program</span>
+</div>
                 <div class="submenu-item" onclick="location.href='laporan_keuangan.php'">
                     <i class="fas fa-chart-line"></i>
                     <span>Laporan Keuangan</span>
                 </div>
-                <div class="submenu-item" onclick="location.href='verifikasi_program.php'">
-    <i class="fas fa-hand-holding-heart"></i>
-    <span>Verifikasi Program</span>
-</div>
+               
             </div>
             
             <!-- Master Data (dengan submenu) -->
@@ -586,14 +592,14 @@ $recentDonasi = query($queryRecent);
                 </div>
             </div>
             <div class="stat-card pending">
-                <div class="stat-info">
-                    <h4><i class="fas fa-clock"></i> Menunggu Verifikasi Doa Khusus</h4>
-                    <div class="value"><?php echo $totalDoaPending; ?> Doa</div>
-                </div>
-                <div class="stat-icon">
-                    <i class="fas fa-praying-hands"></i>
-                </div>
-            </div>
+    <div class="stat-info">
+        <h4><i class="fas fa-clock"></i> Menunggu Verifikasi Donasi Program</h4>
+        <div class="value"><?php echo $totalProgramPending; ?> Donasi</div>
+    </div>
+    <div class="stat-icon">
+        <i class="fas fa-chalkboard-user"></i>
+    </div>
+</div>
         </div>
         
         <!-- ======================================================

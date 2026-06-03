@@ -90,14 +90,14 @@ $program_list = query($sql);
                 <div><h3>Panti Asuhan</h3><p>Al-Muthi</p></div>
             </div>
             <div class="sidebar-menu">
-                <div class="menu-item" onclick="location.href='donatur/dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Beranda</span></div>
+                <div class="menu-item" onclick="location.href='donatur/dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
                 <div class="menu-item" onclick="location.href='donatur/donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
                 <div class="menu-item active" onclick="location.href='semua_program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Donasi</span></div>
                 <div class="menu-item" onclick="location.href='donatur/histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
-                <div class="menu-item" onclick="location.href='donatur/laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Laporan Pengeluaran</span></div>
-                <div class="menu-item" onclick="location.href='donatur/doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
+                <div class="menu-item" onclick="location.href='donatur/laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+                <div class="menu-item" onclick="location.href='donatur/doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khususon Do'a</span></div>
                 <div class="menu-item" onclick="location.href='donatur/perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
-                <div class="menu-item" onclick="location.href='donatur/laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
+                <div class="menu-item" onclick="location.href='donatur/laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
             </div>
         </div>
         

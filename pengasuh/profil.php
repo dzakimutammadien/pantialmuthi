@@ -410,23 +410,15 @@ unset($_SESSION['success']);
             </div>
         </div>
         <div class="sidebar-menu">
-            <div class="menu-item" onclick="location.href='dashboard.php'">
-                <i class="fas fa-tachometer-alt"></i>
-                <span>Beranda</span>
+            <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
+            <div class="menu-item" onclick="location.href='pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+            <div class="menu-item active" onclick="location.href='doa.php'"><i class="fas fa-pray"></i><span>Permohonan Khusus Do'a</span></div>
+            <div class="menu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
+            
+             <div class="menu-item" onclick="location.href='perkembangan.php'">
+                <i class="fas fa-seedling"></i>
+                <span>Perkembangan Anak</span>
             </div>
-            <div class="menu-item" onclick="location.href='pengeluaran.php'">
-                <i class="fas fa-money-bill-wave"></i>
-                <span>Pengeluaran Panti</span>
-            </div>
-            <div class="menu-item" onclick="location.href='doa.php'">
-                <i class="fas fa-pray"></i>
-                <span>Permohonan Khusus Do'a</span>
-            </div>
-            <div class="menu-item" onclick="location.href='anak_asuh.php'">
-                <i class="fas fa-child"></i>
-                <span>Data Anak Asuh</span>
-            </div>
-            <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
         </div>
         </div>
     </div>

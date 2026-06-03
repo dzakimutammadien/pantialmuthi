@@ -282,9 +282,10 @@ unset($_SESSION['success'], $_SESSION['error']);
         <div class="sidebar-menu">
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
             <div class="menu-item" onclick="location.href='pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-            <div class="menu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
-            <div class="menu-item" onclick="location.href='doa.php'"><i class="fas fa-pray"></i><span>Permohonan Doa</span></div>
-             <div class="menu-item" onclick="location.href='perkembangan.php'">
+            
+            <div class="menu-item" onclick="location.href='doa.php'"><i class="fas fa-pray"></i><span>Permohonan Khusus Doa</span></div>
+            <div class="menu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div> 
+            <div class="menu-item" onclick="location.href='perkembangan.php'">
                 <i class="fas fa-seedling"></i>
                 <span>Perkembangan Anak</span>
             </div>
