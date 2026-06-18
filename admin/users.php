@@ -120,7 +120,7 @@ if (isset($_POST['edit'])) {
 }
 
 // ======================================================
-// HAPUS USER (DENGAN PENGECEKAN DATA TERKAIT)
+// HAPUS USER (DENGAN PENGECEKAN DATA TERKAIT + HAPUS LOG)
 // ======================================================
 if (isset($_GET['hapus'])) {
     $id = (int)$_GET['hapus'];
@@ -128,24 +128,30 @@ if (isset($_GET['hapus'])) {
     if ($id == $currentUser['id']) {
         $_SESSION['error'] = "Anda tidak bisa menghapus akun sendiri!";
     } else {
-        // Cek apakah user memiliki data terkait
+        // Cek apakah user memiliki data terkait (donasi, pengeluaran, doa, anak asuh, donasi program)
         $check_donasi = mysqli_query($conn, "SELECT COUNT(*) as total FROM donasi WHERE user_id = $id");
         $check_pengeluaran = mysqli_query($conn, "SELECT COUNT(*) as total FROM pengeluaran WHERE created_by = $id");
         $check_doa = mysqli_query($conn, "SELECT COUNT(*) as total FROM doa WHERE user_id = $id");
         $check_anak = mysqli_query($conn, "SELECT COUNT(*) as total FROM anak_asuh WHERE created_by = $id");
+        $check_donasi_program = mysqli_query($conn, "SELECT COUNT(*) as total FROM donasi_program WHERE user_id = $id");
         
         $donasi_count = mysqli_fetch_assoc($check_donasi)['total'];
         $pengeluaran_count = mysqli_fetch_assoc($check_pengeluaran)['total'];
         $doa_count = mysqli_fetch_assoc($check_doa)['total'];
         $anak_count = mysqli_fetch_assoc($check_anak)['total'];
+        $donasi_program_count = mysqli_fetch_assoc($check_donasi_program)['total'];
         
-        if ($donasi_count > 0 || $pengeluaran_count > 0 || $doa_count > 0 || $anak_count > 0) {
-            $_SESSION['error'] = "User tidak bisa dihapus karena memiliki data terkait! (Donasi: $donasi_count, Pengeluaran: $pengeluaran_count, Doa: $doa_count, Anak Asuh: $anak_count)";
+        if ($donasi_count > 0 || $pengeluaran_count > 0 || $doa_count > 0 || $anak_count > 0 || $donasi_program_count > 0) {
+            $_SESSION['error'] = "User tidak bisa dihapus karena memiliki data terkait! (Donasi: $donasi_count, Pengeluaran: $pengeluaran_count, Doa: $doa_count, Anak Asuh: $anak_count, Donasi Program: $donasi_program_count)";
         } else {
             // Ambil foto untuk dihapus
             $query_foto = mysqli_query($conn, "SELECT foto_profil FROM users WHERE id = $id");
             $foto = mysqli_fetch_assoc($query_foto)['foto_profil'];
             
+            // Hapus log aktivitas terlebih dahulu (karena foreign key constraint)
+            mysqli_query($conn, "DELETE FROM log_aktivitas WHERE user_id = $id");
+            
+            // Hapus user
             $sql = "DELETE FROM users WHERE id = $id";
             if (mysqli_query($conn, $sql)) {
                 if ($foto && $foto != 'default-user.png' && file_exists('../assets/uploads/users/' . $foto)) {
@@ -329,10 +335,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="submenu">
                 <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
                 <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-                    <div class="submenu-item" onclick="location.href='verifikasi_program.php'">
-    <i class="fas fa-heart"></i>
-    <span>Verifikasi Program</span>
-</div>
+                <div class="submenu-item" onclick="location.href='verifikasi_program.php'"><i class="fas fa-heart"></i><span>Verifikasi Program</span></div>
                 <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
             </div>
             <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
@@ -340,7 +343,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="submenu-item" onclick="location.href='kategori_donasi.php'"><i class="fas fa-tags"></i><span>Kategori Transaksi</span></div>
                 <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
                 <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
-                <div class="submenu-item active" onclick="location.href='program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
+                <div class="submenu-item" onclick="location.href='program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
                 <div class="submenu-item" onclick="location.href='galeri.php'"><i class="fas fa-images"></i><span>Galeri</span></div>
                 <div class="submenu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
                 <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
@@ -425,7 +428,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                             </td>
                         </tr>
                         <?php endforeach; else: ?>
-                        <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada data user</td></tr>
+                        <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada data user</td>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -553,7 +556,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <div class="detail-item"><div class="detail-label">Jenis Kelamin</div><div class="detail-value">${u.jenis_kelamin=='L'?'Laki-laki':'Perempuan'}</div></div>
                             <div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">${u.email||'-'}</div></div>
                             <div class="detail-item"><div class="detail-label">No. Whatsapp</div><div class="detail-value">${u.no_whatsapp||'-'}</div></div>
-                                                       <div class="detail-item"><div class="detail-label">Alamat</div><div class="detail-value">${u.alamat||'-'}</div></div>
+                            <div class="detail-item"><div class="detail-label">Alamat</div><div class="detail-value">${u.alamat||'-'}</div></div>
                             <div class="detail-item"><div class="detail-label">Role</div><div class="detail-value">${u.nama_role}</div></div>
                             <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${statusText}</div></div>
                             <div class="detail-item"><div class="detail-label">Dibuat Pada</div><div class="detail-value">${u.created_at}</div></div>

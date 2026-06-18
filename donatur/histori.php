@@ -21,41 +21,28 @@ if (isset($_GET['hapus'])) {
     $tipe = isset($_GET['tipe']) ? $_GET['tipe'] : 'biasa';
     
     if ($tipe == 'biasa') {
-        // Hapus donasi biasa
-        $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi WHERE id = $id AND user_id = " . $currentUser['id']);
-        $data = mysqli_fetch_assoc($check);
+    // Hapus donasi biasa
+    $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi WHERE id = $id AND user_id = " . $currentUser['id']);
+    $data = mysqli_fetch_assoc($check);
+    
+    if ($data && in_array($data['status'], ['pending', 'failed'])) {
+        // Hapus dulu relasi di donasi_program (jika ada)
+        mysqli_query($conn, "DELETE FROM donasi_program WHERE donasi_id = $id");
         
-        if ($data && in_array($data['status'], ['pending', 'failed'])) {
-            if ($data['bukti_transfer'] && file_exists('../assets/uploads/bukti_transfer/' . $data['bukti_transfer'])) {
-                unlink('../assets/uploads/bukti_transfer/' . $data['bukti_transfer']);
-            }
-            $sql = "DELETE FROM donasi WHERE id = $id";
-            if (mysqli_query($conn, $sql)) {
-                logActivity($currentUser['id'], "Menghapus donasi biasa ID: $id");
-                $_SESSION['success'] = "Donasi berhasil dihapus!";
-            } else {
-                $_SESSION['error'] = "Gagal menghapus donasi!";
-            }
+        if ($data['bukti_transfer'] && file_exists('../assets/uploads/bukti_transfer/' . $data['bukti_transfer'])) {
+            unlink('../assets/uploads/bukti_transfer/' . $data['bukti_transfer']);
+        }
+        $sql = "DELETE FROM donasi WHERE id = $id";
+        if (mysqli_query($conn, $sql)) {
+            logActivity($currentUser['id'], "Menghapus donasi biasa ID: $id");
+            $_SESSION['success'] = "Donasi berhasil dihapus!";
         } else {
-            $_SESSION['error'] = "Donasi yang sudah sukses tidak bisa dihapus!";
+            $_SESSION['error'] = "Gagal menghapus donasi!";
         }
     } else {
-        // Hapus donasi program
-        $check = mysqli_query($conn, "SELECT status FROM donasi_program WHERE id = $id AND user_id = " . $currentUser['id']);
-        $data = mysqli_fetch_assoc($check);
-        
-        if ($data && in_array($data['status'], ['pending', 'failed'])) {
-            $sql = "DELETE FROM donasi_program WHERE id = $id";
-            if (mysqli_query($conn, $sql)) {
-                logActivity($currentUser['id'], "Menghapus donasi program ID: $id");
-                $_SESSION['success'] = "Donasi program berhasil dihapus!";
-            } else {
-                $_SESSION['error'] = "Gagal menghapus donasi program!";
-            }
-        } else {
-            $_SESSION['error'] = "Donasi program yang sudah sukses tidak bisa dihapus!";
-        }
+        $_SESSION['error'] = "Donasi yang sudah sukses tidak bisa dihapus!";
     }
+}
     header("Location: histori.php");
     exit();
 }
@@ -313,7 +300,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <table>
                     <thead>
                         <tr>
-                            <th>Tanggal</th>
+                            <th >Tanggal</th>
                             <th>Tipe</th>
                             <th>Kategori/Program</th>
                             <th>Keterangan</th>
@@ -351,11 +338,13 @@ unset($_SESSION['success'], $_SESSION['error']);
                                 <td>
                                     <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-info-circle"></i> Detail</button>
                                     <?php if ($canEditDelete): ?>
-                                        <?php if ($r['tipe'] == 'biasa'): ?>
-                                            <button class="btn-action btn-edit" onclick="location.href='edit_donasi.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
-                                        <?php endif; ?>
-                                        <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-trash"></i> Hapus</button>
-                                    <?php endif; ?>
+    <?php if ($r['tipe'] == 'biasa'): ?>
+        <button class="btn-action btn-edit" onclick="location.href='../edit_donasi.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
+    <?php elseif ($r['tipe'] == 'program'): ?>
+        <button class="btn-action btn-edit" onclick="location.href='../edit_donasi_program.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
+    <?php endif; ?>
+    <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-trash"></i> Hapus</button>
+<?php endif; ?>
                                         </td>
                                         </tr>
                         <?php endforeach; else: ?>

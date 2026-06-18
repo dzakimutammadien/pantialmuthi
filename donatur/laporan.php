@@ -1,8 +1,8 @@
 <?php
 // ======================================================
-// FILE: donatur/laporan_keuangan.php
+// FILE: donatur/laporan.php
 // HALAMAN LAPORAN KEUANGAN UNTUK DONATUR
-// (Nama donatur diganti "Hamba Allah" untuk privacy)
+// DENGAN PENYALURAN PROGRAM
 // ======================================================
 
 require_once '../config/database.php';
@@ -20,16 +20,24 @@ $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 
 // ======================================================
-// AMBIL DATA PEMASUKAN (Donasi Sukses)
+// PEMASUKAN: Donasi Biasa + Donasi Program
 // ======================================================
-$sql_pemasukan = "SELECT SUM(nominal) as total FROM donasi 
-                  WHERE status = 'success' 
-                  AND DATE(tanggal_donasi) BETWEEN '$start_date' AND '$end_date'";
-$result_pemasukan = mysqli_query($conn, $sql_pemasukan);
-$total_pemasukan = mysqli_fetch_assoc($result_pemasukan)['total'] ?? 0;
+$sql_pemasukan_biasa = "SELECT SUM(nominal) as total FROM donasi 
+                        WHERE status = 'success' 
+                        AND DATE(tanggal_donasi) BETWEEN '$start_date' AND '$end_date'";
+$result_pemasukan_biasa = mysqli_query($conn, $sql_pemasukan_biasa);
+$total_pemasukan_biasa = mysqli_fetch_assoc($result_pemasukan_biasa)['total'] ?? 0;
+
+$sql_pemasukan_program = "SELECT SUM(nominal) as total FROM donasi_program 
+                          WHERE status = 'success' 
+                          AND DATE(created_at) BETWEEN '$start_date' AND '$end_date'";
+$result_pemasukan_program = mysqli_query($conn, $sql_pemasukan_program);
+$total_pemasukan_program = mysqli_fetch_assoc($result_pemasukan_program)['total'] ?? 0;
+
+$total_pemasukan = $total_pemasukan_biasa + $total_pemasukan_program;
 
 // ======================================================
-// AMBIL DATA PENGELUARAN (Pengeluaran Disetujui)
+// PENGELUARAN OPERASIONAL (disetujui)
 // ======================================================
 $sql_pengeluaran = "SELECT SUM(nominal) as total FROM pengeluaran 
                     WHERE status = 'disetujui' 
@@ -37,15 +45,28 @@ $sql_pengeluaran = "SELECT SUM(nominal) as total FROM pengeluaran
 $result_pengeluaran = mysqli_query($conn, $sql_pengeluaran);
 $total_pengeluaran = mysqli_fetch_assoc($result_pengeluaran)['total'] ?? 0;
 
-$saldo = $total_pemasukan - $total_pengeluaran;
+// ======================================================
+// PENYALURAN PROGRAM (penerima_manfaat)
+// ======================================================
+$sql_penyaluran = "SELECT SUM(jumlah) as total FROM penerima_manfaat 
+                   WHERE DATE(tanggal_penyaluran) BETWEEN '$start_date' AND '$end_date'";
+$result_penyaluran = mysqli_query($conn, $sql_penyaluran);
+$total_penyaluran = mysqli_fetch_assoc($result_penyaluran)['total'] ?? 0;
+
+// TOTAL PENGELUARAN = Operasional + Penyaluran
+$total_pengeluaran_all = $total_pengeluaran + $total_penyaluran;
+
+// Saldo
+$saldo = $total_pemasukan - $total_pengeluaran_all;
 
 // ======================================================
-// RINCIAN TRANSAKSI (Nama donatur sendiri muncul, donatur lain jadi "Hamba Allah")
+// RINCIAN TRANSAKSI (Donasi Biasa + Program + Pengeluaran + Penyaluran)
 // ======================================================
 $sql_rincian = "
     (SELECT 
         tanggal_donasi as tanggal,
         'Pemasukan' as jenis,
+        'biasa' as tipe,
         CASE 
             WHEN d.user_id = " . $currentUser['id'] . " THEN u.nama_lengkap
             ELSE 'Hamba Allah'
@@ -53,7 +74,8 @@ $sql_rincian = "
         k.nama_kategori as kategori,
         d.keterangan as keterangan,
         d.nominal as jumlah,
-        0 as keluar
+        0 as keluar,
+        NULL as penerima
     FROM donasi d
     JOIN users u ON d.user_id = u.id
     JOIN kategori_donasi k ON d.kategori_id = k.id
@@ -63,21 +85,59 @@ $sql_rincian = "
     UNION ALL
     
     (SELECT 
+        dp.created_at as tanggal,
+        'Pemasukan' as jenis,
+        'program' as tipe,
+        CASE 
+            WHEN dp.user_id = " . $currentUser['id'] . " THEN u.nama_lengkap
+            ELSE 'Hamba Allah'
+        END as nama,
+        p.nama_program as kategori,
+        dp.pesan as keterangan,
+        dp.nominal as jumlah,
+        0 as keluar,
+        NULL as penerima
+    FROM donasi_program dp
+    JOIN users u ON dp.user_id = u.id
+    JOIN program_donasi p ON dp.program_id = p.id
+    WHERE dp.status = 'success' 
+    AND DATE(dp.created_at) BETWEEN '$start_date' AND '$end_date')
+    
+    UNION ALL
+    
+    (SELECT 
         p.tanggal_pengeluaran as tanggal,
         'Pengeluaran' as jenis,
+        'operasional' as tipe,
         u.nama_lengkap as nama,
         k.nama_kategori as kategori,
         p.deskripsi as keterangan,
         0 as masuk,
-        p.nominal as keluar
+        p.nominal as keluar,
+        NULL as penerima
     FROM pengeluaran p
     JOIN users u ON p.created_by = u.id
     JOIN kategori_donasi k ON p.kategori_id = k.id
     WHERE p.status = 'disetujui' 
     AND DATE(p.tanggal_pengeluaran) BETWEEN '$start_date' AND '$end_date')
     
+    UNION ALL
+    
+    (SELECT 
+        pm.tanggal_penyaluran as tanggal,
+        'Pengeluaran' as jenis,
+        'penyaluran' as tipe,
+        'Penyaluran Program' as nama,
+        CONCAT('Penyaluran - ', pm.jenis_bantuan) as kategori,
+        CONCAT('Penerima: ', pm.nama_penerima, IF(pm.keterangan != '', CONCAT(' | ', pm.keterangan), '')) as keterangan,
+        0 as masuk,
+        pm.jumlah as keluar,
+        pm.nama_penerima as penerima
+    FROM penerima_manfaat pm
+    WHERE DATE(pm.tanggal_penyaluran) BETWEEN '$start_date' AND '$end_date')
+    
     ORDER BY tanggal DESC
-    LIMIT 50";
+    LIMIT 100";
 $rincian = query($sql_rincian);
 
 // ======================================================
@@ -87,13 +147,36 @@ $sql_kategori = "
     SELECT 
         k.id,
         k.nama_kategori,
-        COALESCE((SELECT SUM(d.nominal) FROM donasi d WHERE d.kategori_id = k.id AND d.status = 'success' AND DATE(d.tanggal_donasi) BETWEEN '$start_date' AND '$end_date'), 0) as pemasukan,
+        COALESCE((SELECT SUM(d.nominal) FROM donasi d WHERE d.kategori_id = k.id AND d.status = 'success' AND DATE(d.tanggal_donasi) BETWEEN '$start_date' AND '$end_date'), 0) as pemasukan_biasa,
         COALESCE((SELECT SUM(p.nominal) FROM pengeluaran p WHERE p.kategori_id = k.id AND p.status = 'disetujui' AND DATE(p.tanggal_pengeluaran) BETWEEN '$start_date' AND '$end_date'), 0) as pengeluaran
     FROM kategori_donasi k
     WHERE k.tipe IN ('donasi', 'both') OR k.tipe IN ('pengeluaran', 'both')
     GROUP BY k.id
     ORDER BY k.nama_kategori ASC";
 $kategori_laporan = query($sql_kategori);
+
+// Kategori Program
+$sql_program_kategori = "
+    SELECT 
+        p.id,
+        p.nama_program as nama_kategori,
+        COALESCE((SELECT SUM(dp.nominal) FROM donasi_program dp WHERE dp.program_id = p.id AND dp.status = 'success' AND DATE(dp.created_at) BETWEEN '$start_date' AND '$end_date'), 0) as pemasukan_program,
+        0 as pengeluaran
+    FROM program_donasi p
+    HAVING pemasukan_program > 0
+    ORDER BY p.nama_program ASC";
+$program_kategori = query($sql_program_kategori);
+
+// Kategori Penyaluran
+$sql_penyaluran_kategori = "
+    SELECT 
+        'Penyaluran Program' as nama_kategori,
+        0 as pemasukan_biasa,
+        COALESCE((SELECT SUM(jumlah) FROM penerima_manfaat WHERE DATE(tanggal_penyaluran) BETWEEN '$start_date' AND '$end_date'), 0) as pengeluaran
+";
+$penyaluran = mysqli_query($conn, $sql_penyaluran_kategori);
+$penyaluran_kategori = mysqli_fetch_assoc($penyaluran);
+$penyaluran_kategori = $penyaluran_kategori && $penyaluran_kategori['pengeluaran'] > 0 ? [$penyaluran_kategori] : [];
 ?>
 
 <!DOCTYPE html>
@@ -108,7 +191,6 @@ $kategori_laporan = query($sql_kategori);
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
         
-        /* SIDEBAR */
         .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; z-index: 100; }
         .sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; justify-content: center; }
         .sidebar-logo { width: 45px; height: 45px; object-fit: contain; }
@@ -120,10 +202,7 @@ $kategori_laporan = query($sql_kategori);
         .menu-item i { width: 24px; font-size: 18px; }
         .menu-item span { font-size: 14px; }
         
-        /* MAIN CONTENT */
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
-        
-        /* TOPBAR */
         .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
         .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
@@ -134,10 +213,8 @@ $kategori_laporan = query($sql_kategori);
         .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
         .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
         
-        /* CONTENT */
         .content-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 25px; }
         
-        /* FILTER */
         .filter-section {
             display: flex;
             gap: 15px;
@@ -154,47 +231,32 @@ $kategori_laporan = query($sql_kategori);
         .btn-filter { background: #50c878; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
         .btn-reset { background: #6c757d; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
         
-        /* SUMMARY CARDS */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .summary-card {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .summary-info h4 { font-size: 13px; color: #888; margin-bottom: 8px; }
-        .summary-info .value { font-size: 24px; font-weight: 700; color: #333; }
-        .summary-icon { width: 55px; height: 55px; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .summary-card { background: white; border-radius: 20px; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .summary-info h4 { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .summary-info .value { font-size: 22px; font-weight: 700; color: #333; }
+        .summary-info small { font-size: 11px; color: #999; display: block; margin-top: 3px; }
+        .summary-icon { width: 50px; height: 50px; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
         .summary-card.pemasukan .summary-icon { background: #e8f5e9; color: #4caf50; }
         .summary-card.pengeluaran .summary-icon { background: #ffebee; color: #f44336; }
+        .summary-card.penyaluran .summary-icon { background: #fff3e0; color: #ff9800; }
         .summary-card.saldo .summary-icon { background: #e3f2fd; color: #2196f3; }
+        .summary-card.saldo .value { color: #2196f3; }
         
-        /* TABLE */
         .table-wrapper { overflow-x: auto; width: 100%; }
-        table { width: 100%; min-width: 600px; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; font-size: 13px; font-weight: 600; color: #666; }
+        table { width: 100%; min-width: 750px; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-size: 12px; font-weight: 600; color: #666; }
         td { font-size: 13px; color: #555; }
         .text-right { text-align: right; }
-        .badge-masuk { background: #e8f5e9; color: #4caf50; padding: 4px 8px; border-radius: 20px; font-size: 11px; display: inline-block; }
-        .badge-keluar { background: #ffebee; color: #f44336; padding: 4px 8px; border-radius: 20px; font-size: 11px; display: inline-block; }
-        .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .badge-masuk { background: #e8f5e9; color: #4caf50; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-keluar { background: #ffebee; color: #f44336; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-tipe-program { background: #f3e5f5; color: #9c27b0; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-tipe-biasa { background: #e3f2fd; color: #2196f3; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-tipe-penyaluran { background: #fff3e0; color: #e65100; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        .badge-tipe-operasional { background: #fce4ec; color: #c62828; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-block; }
+        
+        .section-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
         
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
@@ -209,19 +271,12 @@ $kategori_laporan = query($sql_kategori);
         <div class="sidebar-menu">
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
             <div class="menu-item" onclick="location.href='donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
-            <div class="menu-item" onclick="location.href='../semua_program.php'">
-        <i class="fas fa-chalkboard-user"></i>
-        <span>Program Utama</span>
-    </div>
+            <div class="menu-item" onclick="location.href='../semua_program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
             <div class="menu-item" onclick="location.href='histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
             <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Laporan Pengeluaran</span></div>
             <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
-            
-             <div class="menu-item" onclick="location.href='perkembangan.php'">
-    <i class="fas fa-seedling"></i>
-    <span>Perkembangan Anak</span>
-</div>
-<div class="menu-item active" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+            <div class="menu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
+            <div class="menu-item active" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
         </div>
     </div>
     
@@ -229,7 +284,7 @@ $kategori_laporan = query($sql_kategori);
         <div class="topbar">
             <div class="page-title">
                 <h2>Laporan Keuangan</h2>
-                <p>Rekap pemasukan dan pengeluaran panti</p>
+                <p>Rekap pemasukan dan pengeluaran panti (termasuk penyaluran program)</p>
             </div>
             <div class="profile-dropdown">
                 <div class="profile-icon"><i class="fas fa-cog"></i></div>
@@ -252,7 +307,7 @@ $kategori_laporan = query($sql_kategori);
                     <input type="date" name="end_date" value="<?php echo $end_date; ?>">
                 </div>
                 <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Tampilkan</button>
-                <a href="laporan_keuangan.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
+                <a href="laporan.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
             </form>
         </div>
         
@@ -260,22 +315,36 @@ $kategori_laporan = query($sql_kategori);
         <div class="summary-grid">
             <div class="summary-card pemasukan">
                 <div class="summary-info">
-                    <h4>Pemasukan Panti</h4>
+                    <h4><i class="fas fa-arrow-down"></i> Total Pemasukan</h4>
                     <div class="value">Rp <?php echo number_format($total_pemasukan, 0, ',', '.'); ?></div>
+                    <small>Biasa: Rp <?php echo number_format($total_pemasukan_biasa, 0, ',', '.'); ?> + Program: Rp <?php echo number_format($total_pemasukan_program, 0, ',', '.'); ?></small>
                 </div>
                 <div class="summary-icon"><i class="fas fa-hand-holding-usd"></i></div>
             </div>
+            
             <div class="summary-card pengeluaran">
                 <div class="summary-info">
-                    <h4>Pengeluaran Panti</h4>
-                    <div class="value">Rp <?php echo number_format($total_pengeluaran, 0, ',', '.'); ?></div>
+                    <h4><i class="fas fa-arrow-up"></i> Total Pengeluaran</h4>
+                    <div class="value">Rp <?php echo number_format($total_pengeluaran_all, 0, ',', '.'); ?></div>
+                    <small>Operasional: Rp <?php echo number_format($total_pengeluaran, 0, ',', '.'); ?> + Penyaluran: Rp <?php echo number_format($total_penyaluran, 0, ',', '.'); ?></small>
                 </div>
                 <div class="summary-icon"><i class="fas fa-money-bill-wave"></i></div>
             </div>
+            
+            <div class="summary-card penyaluran">
+                <div class="summary-info">
+                    <h4><i class="fas fa-hands-helping"></i> Total Penyaluran</h4>
+                    <div class="value">Rp <?php echo number_format($total_penyaluran, 0, ',', '.'); ?></div>
+                    <small>Ke penerima manfaat</small>
+                </div>
+                <div class="summary-icon"><i class="fas fa-users"></i></div>
+            </div>
+            
             <div class="summary-card saldo">
                 <div class="summary-info">
-                    <h4>Saldo Panti</h4>
+                    <h4><i class="fas fa-wallet"></i> Saldo Panti</h4>
                     <div class="value">Rp <?php echo number_format($saldo, 0, ',', '.'); ?></div>
+                    <small>Pemasukan - Pengeluaran</small>
                 </div>
                 <div class="summary-icon"><i class="fas fa-coins"></i></div>
             </div>
@@ -286,12 +355,19 @@ $kategori_laporan = query($sql_kategori);
             <div class="section-title">
                 <i class="fas fa-list-ul" style="color:#50c878;"></i>
                 <span>Rincian Transaksi</span>
+                <span style="font-size:12px;color:#888;font-weight:400;margin-left:10px;">
+                    <span class="badge-tipe-biasa">💝 Biasa</span>
+                    <span class="badge-tipe-program">📦 Program</span>
+                    <span class="badge-tipe-operasional">💸 Operasional</span>
+                    <span class="badge-tipe-penyaluran">🤝 Penyaluran</span>
+                </span>
             </div>
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th>Tanggal</th>
+                            <th>Tipe</th>
                             <th>Nama</th>
                             <th>Kategori</th>
                             <th>Keterangan</th>
@@ -304,6 +380,19 @@ $kategori_laporan = query($sql_kategori);
                             <?php foreach ($rincian as $r): ?>
                                 <tr>
                                     <td><?php echo date('d/m/Y', strtotime($r['tanggal'])); ?></td>
+                                    <td>
+                                        <?php if ($r['jenis'] == 'Pemasukan'): ?>
+                                            <?php if ($r['tipe'] == 'program'): ?>
+                                                <span class="badge-tipe-program">📦 Program</span>
+                                            <?php else: ?>
+                                                <span class="badge-tipe-biasa">💝 Biasa</span>
+                                            <?php endif; ?>
+                                        <?php elseif ($r['tipe'] == 'penyaluran'): ?>
+                                            <span class="badge-tipe-penyaluran">🤝 Penyaluran</span>
+                                        <?php else: ?>
+                                            <span class="badge-tipe-operasional">💸 Operasional</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($r['nama']); ?></td>
                                     <td><?php echo htmlspecialchars($r['kategori']); ?></td>
                                     <td><?php echo htmlspecialchars($r['keterangan']) ?: '-'; ?></td>
@@ -313,18 +402,18 @@ $kategori_laporan = query($sql_kategori);
                                         <?php else: ?>
                                             -
                                         <?php endif; ?>
-                                        </td>
+                                    </td>
                                     <td class="text-right">
                                         <?php if ($r['jenis'] == 'Pengeluaran'): ?>
                                             <span class="badge-keluar">Rp <?php echo number_format($r['keluar'], 0, ',', '.'); ?></span>
                                         <?php else: ?>
                                             -
                                         <?php endif; ?>
-                                        </td>
-                                </tr
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <tr><td colspan="6" style="text-align:center; padding:40px;">Tidak ada transaksi pada periode ini</td></tr>
+                            <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada transaksi pada periode ini</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -348,22 +437,63 @@ $kategori_laporan = query($sql_kategori);
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (count($kategori_laporan) > 0): ?>
-                            <?php foreach ($kategori_laporan as $k): ?>
-                                <?php $selisih = $k['pemasukan'] - $k['pengeluaran']; ?>
+                        <?php 
+                        $hasData = false;
+                        foreach ($kategori_laporan as $k) {
+                            if ($k['pemasukan_biasa'] > 0 || $k['pengeluaran'] > 0) {
+                                $hasData = true;
+                                $selisih = $k['pemasukan_biasa'] - $k['pengeluaran'];
+                                ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($k['nama_kategori']); ?></td>
-                                    <td class="text-right"><?php echo $k['pemasukan'] > 0 ? 'Rp ' . number_format($k['pemasukan'], 0, ',', '.') : '-'; ?></td>
+                                    <td class="text-right"><?php echo $k['pemasukan_biasa'] > 0 ? 'Rp ' . number_format($k['pemasukan_biasa'], 0, ',', '.') : '-'; ?></td>
                                     <td class="text-right"><?php echo $k['pengeluaran'] > 0 ? 'Rp ' . number_format($k['pengeluaran'], 0, ',', '.') : '-'; ?></td>
                                     <td class="text-right">
                                         <span style="color: <?php echo $selisih >= 0 ? '#4caf50' : '#f44336'; ?>">
-                                            Rp <?php echo number_format(abs($selisih), 0, ',', '.'); ?>
-                                            <?php echo $selisih >= 0 ? '(Surplus)' : '(Defisit)'; ?>
+                                            <?php echo $selisih >= 0 ? '+' : '-'; ?>Rp <?php echo number_format(abs($selisih), 0, ',', '.'); ?>
                                         </span>
-                            </td>
-                                </tr
-                            <?php endforeach; ?>
-                        <?php else: ?>
+                                    </td>
+                                </tr>
+                                <?php
+                            }
+                        }
+                        
+                        foreach ($program_kategori as $p) {
+                            $hasData = true;
+                            ?>
+                            <tr>
+                                <td>📦 <?php echo htmlspecialchars($p['nama_kategori']); ?> (Program)</td>
+                                <td class="text-right">Rp <?php echo number_format($p['pemasukan_program'], 0, ',', '.'); ?></td>
+                                <td class="text-right">-</td>
+                                <td class="text-right">
+                                    <span style="color: #4caf50;">
+                                        +Rp <?php echo number_format($p['pemasukan_program'], 0, ',', '.'); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php
+                        }
+                        
+                        foreach ($penyaluran_kategori as $pen) {
+                            if ($pen['pengeluaran'] > 0) {
+                                $hasData = true;
+                                ?>
+                                <tr>
+                                    <td>🤝 <?php echo htmlspecialchars($pen['nama_kategori']); ?></td>
+                                    <td class="text-right">-</td>
+                                    <td class="text-right">Rp <?php echo number_format($pen['pengeluaran'], 0, ',', '.'); ?></td>
+                                    <td class="text-right">
+                                        <span style="color: #f44336;">
+                                            -Rp <?php echo number_format($pen['pengeluaran'], 0, ',', '.'); ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <?php
+                            }
+                        }
+                        
+                        if (!$hasData):
+                        ?>
                             <tr><td colspan="4" style="text-align:center; padding:40px;">Tidak ada data kategori</td></tr>
                         <?php endif; ?>
                     </tbody>

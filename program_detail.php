@@ -65,25 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['donasi_program'])) {
         }
     }
     
-    // Tentukan nama akhir
     $nama_donatur_final = ($is_anonim == 1) ? 'Hamba Allah' : ($nama_donatur ?: 'Hamba Allah');
     
     // Jika user login
     if (isLoggedIn() && getUserRole() == 'donatur') {
         $user_id = $_SESSION['user_id'];
         
-        // Simpan ke donasi (untuk histori)
-        $sql_donasi = "INSERT INTO donasi (user_id, kategori_id, nominal, bukti_transfer, catatan_doa, keterangan, status) 
-                       VALUES ($user_id, 1, $nominal, '$bukti_transfer', '$pesan', 'Donasi untuk program: " . $program['nama_program'] . "', 'pending')";
-        mysqli_query($conn, $sql_donasi);
-        $donasi_id = mysqli_insert_id($conn);
-        
-        // Simpan ke donasi_program
-        $sql = "INSERT INTO donasi_program (program_id, user_id, donasi_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
-                VALUES ($program_id, $user_id, $donasi_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
+        // ======================================================
+        // HANYA SIMPAN KE DONASI_PROGRAM (TIDAK KE DONASI)
+        // ======================================================
+        $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
+                VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
         
     } else {
-        // Donatur tidak login, cek atau buat user anonim
+        // Donatur tidak login
         $user_check = mysqli_query($conn, "SELECT id FROM users WHERE nama_lengkap = '$nama_donatur_final' AND role_id = 3");
         if (mysqli_num_rows($user_check) > 0) {
             $user_id = mysqli_fetch_assoc($user_check)['id'];

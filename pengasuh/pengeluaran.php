@@ -65,18 +65,19 @@ if (isset($_POST['tambah'])) {
     exit();
 }
 
-// Edit Pengeluaran (hanya jika status pending & milik sendiri)
+// ======================================================
+// EDIT PENGELUARAN (Hanya milik sendiri & status pending/ditolak)
+// ======================================================
 if (isset($_POST['edit'])) {
     $id = (int)$_POST['id'];
     
-    // Cek kepemilikan dan status
     $check = mysqli_query($conn, "SELECT created_by, status, bukti_foto FROM pengeluaran WHERE id = $id");
     $data = mysqli_fetch_assoc($check);
     
     if ($data['created_by'] != $currentUser['id']) {
         $_SESSION['error'] = "Anda tidak bisa mengedit pengeluaran milik orang lain!";
-    } elseif ($data['status'] != 'pending') {
-        $_SESSION['error'] = "Pengeluaran yang sudah diverifikasi tidak bisa diedit!";
+    } elseif ($data['status'] == 'disetujui') {
+        $_SESSION['error'] = "Pengeluaran yang sudah disetujui tidak bisa diedit!";
     } else {
         $tanggal_pengeluaran = mysqli_real_escape_string($conn, $_POST['tanggal_pengeluaran']);
         $kategori_id = (int)$_POST['kategori_id'];
@@ -105,7 +106,9 @@ if (isset($_POST['edit'])) {
     exit();
 }
 
-// Hapus Pengeluaran (hanya jika status pending & milik sendiri)
+// ======================================================
+// HAPUS PENGELUARAN (Hanya milik sendiri & status pending/ditolak)
+// ======================================================
 if (isset($_GET['hapus'])) {
     $id = (int)$_GET['hapus'];
     
@@ -114,8 +117,8 @@ if (isset($_GET['hapus'])) {
     
     if ($data['created_by'] != $currentUser['id']) {
         $_SESSION['error'] = "Anda tidak bisa menghapus pengeluaran milik orang lain!";
-    } elseif ($data['status'] != 'pending') {
-        $_SESSION['error'] = "Pengeluaran yang sudah diverifikasi tidak bisa dihapus!";
+    } elseif ($data['status'] == 'disetujui') {
+        $_SESSION['error'] = "Pengeluaran yang sudah disetujui tidak bisa dihapus!";
     } else {
         if ($data['bukti_foto'] && file_exists('../assets/uploads/pengeluaran/' . $data['bukti_foto'])) {
             unlink('../assets/uploads/pengeluaran/' . $data['bukti_foto']);
@@ -140,7 +143,7 @@ $search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['searc
 $filter_kategori = isset($_GET['kategori']) ? (int)$_GET['kategori'] : '';
 $filter_status = isset($_GET['status']) ? mysqli_real_escape_string($conn, $_GET['status']) : '';
 
-$where = "";
+$where = "WHERE 1=1";
 
 if ($search != '') {
     $where .= " AND (u.nama_lengkap LIKE '%$search%' OR p.deskripsi LIKE '%$search%')";
@@ -158,20 +161,20 @@ $offset = ($page - 1) * $limit;
 
 $total_sql = "SELECT COUNT(*) as total FROM pengeluaran p 
               JOIN users u ON p.created_by = u.id 
-              WHERE 1=1 $where";
+              $where";
 $total_result = mysqli_query($conn, $total_sql);
 $total_rows = mysqli_fetch_assoc($total_result)['total'];
 $total_pages = ceil($total_rows / $limit);
 
 $sql = "SELECT p.*, u.nama_lengkap as pengasuh_nama, k.nama_kategori,
         CASE 
-            WHEN p.created_by = " . $currentUser['id'] . " AND p.status = 'pending' THEN 'can_edit'
+            WHEN p.created_by = " . $currentUser['id'] . " AND p.status IN ('pending', 'ditolak') THEN 'can_edit'
             ELSE 'readonly'
         END as akses
         FROM pengeluaran p 
         JOIN users u ON p.created_by = u.id 
         JOIN kategori_donasi k ON p.kategori_id = k.id 
-        WHERE 1=1 $where 
+        $where 
         ORDER BY p.created_at DESC 
         LIMIT $offset, $limit";
 $pengeluarans = query($sql);
