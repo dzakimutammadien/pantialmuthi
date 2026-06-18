@@ -406,7 +406,12 @@ unset($_SESSION['success'], $_SESSION['error']);
                         ?>
                         <tr>
                             <td><?php echo $no++; ?></td>
-                            <td><img src="../assets/uploads/users/<?php echo $user['foto_profil'] ?: 'default-user.png'; ?>" class="foto-thumb" onerror="this.src='../assets/uploads/users/default-user.png'"></td>
+                           <!-- PERBAIKAN: Handle foto NULL dengan lebih baik -->
+<td>
+    <img src="../assets/uploads/users/<?php echo !empty($user['foto_profil']) ? $user['foto_profil'] : 'default-user.png'; ?>" 
+         class="foto-thumb" 
+         onerror="this.src='../assets/uploads/users/default-user.png'">
+</td>
                             <td><?php echo htmlspecialchars($user['nama_lengkap']); ?></td>
                             <td><?php echo htmlspecialchars($user['username']); ?></td>
                             <td><span class="badge-role"><?php echo ucfirst($user['nama_role']); ?></span></td>
@@ -533,7 +538,8 @@ unset($_SESSION['success'], $_SESSION['error']);
                         document.getElementById('edit_role').value=d.user.role_id;
                         document.getElementById('edit_status').value=d.user.is_active;
                         
-                        let fotoUrl = `../assets/uploads/users/${d.user.foto_profil || 'default-user.png'}`;
+                        // PERBAIKAN: Handle foto NULL
+let fotoUrl = `../assets/uploads/users/${(d.user.foto_profil && d.user.foto_profil != '') ? d.user.foto_profil : 'default-user.png'}`;
                         document.getElementById('edit_current_photo').innerHTML = `<label>Foto Saat Ini</label><br><img src="${fotoUrl}" onerror="this.src='../assets/uploads/users/default-user.png'">`;
                         document.getElementById('editModal').classList.add('show');
                     }
@@ -547,7 +553,8 @@ unset($_SESSION['success'], $_SESSION['error']);
                     if(d.success){
                         let u = d.user;
                         let statusText = u.is_active == 1 ? 'Aktif' : 'Nonaktif';
-                        let fotoUrl = `../assets/uploads/users/${u.foto_profil || 'default-user.png'}?_=${Date.now()}`;
+                      // PERBAIKAN: Handle foto NULL
+let fotoUrl = `../assets/uploads/users/${(u.foto_profil && u.foto_profil != '') ? u.foto_profil : 'default-user.png'}?_=${Date.now()}`;
                         
                         document.getElementById('detailContent').innerHTML = `
                             <div class="detail-foto"><img src="${fotoUrl}" onerror="this.src='../assets/uploads/users/default-user.png'"></div>

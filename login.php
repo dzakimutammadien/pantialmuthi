@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: login.php
 // HALAMAN LOGIN + DONASI + PROGRAM KAMI
+// PERBAIKAN: No WhatsApp WAJIB, Cek User Unik
 // ======================================================
 
 require_once 'config/database.php';
@@ -18,54 +19,74 @@ $donasi_success = '';
 $donasi_error = '';
 
 // ======================================================
-// PROSES DONASI (Tanpa Login)
+// PROSES DONASI (Tanpa Login) - PERBAIKAN
 // ======================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['donasi'])) {
     $nama_donatur = mysqli_real_escape_string($conn, $_POST['nama_donatur']);
+    $no_whatsapp = mysqli_real_escape_string($conn, $_POST['no_whatsapp']);
     $kategori_id = (int)$_POST['kategori_id'];
     $nominal = (float)$_POST['nominal'];
     $keterangan = mysqli_real_escape_string($conn, $_POST['keterangan']);
     $catatan_doa = mysqli_real_escape_string($conn, $_POST['catatan_doa']);
     
-    // Upload bukti transfer
-    $bukti_transfer = null;
-    if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($_FILES['bukti_transfer']['name'], PATHINFO_EXTENSION);
-        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $filename = 'donasi_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
-            $target = 'assets/uploads/bukti_transfer/' . $filename;
+    // ======================================================
+    // VALIDASI: No WhatsApp WAJIB diisi
+    // ======================================================
+    if (empty($no_whatsapp)) {
+        $donasi_error = "Nomor WhatsApp wajib diisi untuk konfirmasi donasi!";
+    } else {
+        // Upload bukti transfer
+        $bukti_transfer = null;
+        if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === UPLOAD_ERR_OK) {
+            $ext = pathinfo($_FILES['bukti_transfer']['name'], PATHINFO_EXTENSION);
+            $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
             
-            if (move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $target)) {
-                $bukti_transfer = $filename;
+            if (in_array(strtolower($ext), $allowed)) {
+                $filename = 'donasi_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+                $target = 'assets/uploads/bukti_transfer/' . $filename;
+                
+                if (move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $target)) {
+                    $bukti_transfer = $filename;
+                }
             }
         }
-    }
-    
-    // Tentukan nama_user (jika kosong, pakai "Hamba Allah")
-    $nama_user = !empty($nama_donatur) ? $nama_donatur : 'Hamba Allah';
-    
-    // Cek apakah user sudah ada
-    $user_check = mysqli_query($conn, "SELECT id FROM users WHERE nama_lengkap = '$nama_user' AND role_id = 3");
-    if (mysqli_num_rows($user_check) > 0) {
-        $user_id = mysqli_fetch_assoc($user_check)['id'];
-    } else {
-        // Buat user baru
-        $username = strtolower(str_replace(' ', '_', $nama_user)) . '_' . rand(100, 999);
-        $hash_password = password_hash('donasi123', PASSWORD_DEFAULT);
-        mysqli_query($conn, "INSERT INTO users (username, password, nama_lengkap, role_id, is_active) 
-                             VALUES ('$username', '$hash_password', '$nama_user', 3, 1)");
-        $user_id = mysqli_insert_id($conn);
-    }
-    
-    $sql = "INSERT INTO donasi (user_id, kategori_id, nominal, bukti_transfer, catatan_doa, keterangan, status) 
-            VALUES ($user_id, $kategori_id, $nominal, '$bukti_transfer', '$catatan_doa', '$keterangan', 'pending')";
-    
-    if (mysqli_query($conn, $sql)) {
-        $donasi_success = "Donasi berhasil dikirim! Menunggu verifikasi admin.";
-    } else {
-        $donasi_error = "Gagal mengirim donasi: " . mysqli_error($conn);
+        
+        // Tentukan nama_user (jika kosong, pakai "Hamba Allah")
+        $nama_user = !empty($nama_donatur) ? $nama_donatur : 'Hamba Allah';
+        
+        // ======================================================
+        // CEK USER BERDASARKAN NO WHATSAPP (UNIK)
+        // ======================================================
+        $user_check = mysqli_query($conn, "SELECT id, foto_profil FROM users WHERE no_whatsapp = '$no_whatsapp' AND role_id = 3");
+        
+        if (mysqli_num_rows($user_check) > 0) {
+            // User ditemukan, pakai user yang sudah ada
+            $user_data = mysqli_fetch_assoc($user_check);
+            $user_id = $user_data['id'];
+        } else {
+            // ======================================================
+            // BUAT USER BARU dengan no_whatsapp
+            // ======================================================
+            $username = strtolower(str_replace(' ', '_', $nama_user)) . '_' . rand(100, 999);
+            $hash_password = password_hash('donasi123', PASSWORD_DEFAULT);
+            $foto_default = 'default-user.png';
+            
+            mysqli_query($conn, "INSERT INTO users (username, password, nama_lengkap, role_id, is_active, foto_profil, no_whatsapp) 
+                                 VALUES ('$username', '$hash_password', '$nama_user', 3, 1, '$foto_default', '$no_whatsapp')");
+            $user_id = mysqli_insert_id($conn);
+        }
+        
+        // ======================================================
+        // SIMPAN DONASI
+        // ======================================================
+        $sql = "INSERT INTO donasi (user_id, kategori_id, nominal, bukti_transfer, catatan_doa, keterangan, status) 
+                VALUES ($user_id, $kategori_id, $nominal, '$bukti_transfer', '$catatan_doa', '$keterangan', 'pending')";
+        
+        if (mysqli_query($conn, $sql)) {
+            $donasi_success = "Donasi berhasil dikirim! Menunggu verifikasi admin.";
+        } else {
+            $donasi_error = "Gagal mengirim donasi: " . mysqli_error($conn);
+        }
     }
 }
 
@@ -244,12 +265,21 @@ $program_list = query($sql_program);
             color: #555;
         }
         
+        .form-group label .required {
+            color: #f44336;
+        }
+        
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 10px 12px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 14px;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #50c878;
         }
         
         .btn-login, .btn-donasi {
@@ -262,6 +292,10 @@ $program_list = query($sql_program);
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
+        }
+        
+        .btn-donasi:hover, .btn-login:hover {
+            background: linear-gradient(135deg, #2e8b57 0%, #1a6a3a 100%);
         }
         
         .link-lupapassword {
@@ -302,20 +336,16 @@ $program_list = query($sql_program);
             color: #50c878;
         }
         
-        hr {
-            margin: 20px 0;
-            border: none;
-            border-top: 1px solid #eee;
-        }
-        
         .qris-image {
             text-align: center;
-            margin-top: 15px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 5px;
         }
         
         .qris-image img {
-            width: 150px;
-            border-radius: 15px;
+            width: 80px;
         }
         
         .alert {
@@ -387,18 +417,24 @@ $program_list = query($sql_program);
         
         .program-icon {
             margin-bottom: 15px;
-    background: #f0f2f5;
-    border-radius: 10px;
-    overflow: hidden;
-    height: 180px;
+            background: #f0f2f5;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 180px;
         }
         
         .program-icon img {
-           width: 100%;
-    height: 100%;
-    object-fit: cover 
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
-  
+        
+        .program-icon i {
+            font-size: 48px;
+            color: #50c878;
+            line-height: 180px;
+        }
+        
         .program-card h3 {
             font-size: 16px;
             margin-bottom: 10px;
@@ -502,17 +538,6 @@ $program_list = query($sql_program);
             object-fit: cover;
         }
         
-        .play-icon-small {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 30px;
-            color: white;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5);
-            pointer-events: none;
-        }
-        
         .btn-lihat-semua-galeri {
             display: inline-block;
             background: #50c878;
@@ -523,26 +548,28 @@ $program_list = query($sql_program);
             font-size: 13px;
             margin-top: 15px;
         }
-        .qris-image {
-    text-align: center;
-    background: #f8f9fa;
-    padding: 10px;
-    border-radius: 10px;
-    margin-top: 5px;
-}
-
-.qris-image img {
-    width: 80px;
-}
+        
+        .btn-lihat-semua-galeri:hover {
+            background: #2e8b57;
+        }
+        
+        .info-text {
+            text-align: center;
+            font-size: 11px;
+            color: #888;
+            margin-top: 20px;
+            padding: 15px;
+        }
+        
         @media (max-width: 900px) {
             .main-layout { flex-direction: column; }
             .galeri-preview-grid { grid-template-columns: repeat(2, 1fr); }
         }
         @media (max-width: 768px) {
-    .donasi-section .card-body form > div {
-        grid-template-columns: 1fr !important;
-    }
-}
+            .donasi-section .card-body form > div {
+                grid-template-columns: 1fr !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -595,7 +622,7 @@ $program_list = query($sql_program);
                             <label>Password</label>
                             <input type="password" name="password" placeholder="Masukkan password" required>
                         </div>
-                        
+        
                         <div class="link-lupapassword">
                             <a href="lupa_password.php"><i class="fas fa-key"></i> Lupa Password?</a>
                         </div>
@@ -620,92 +647,101 @@ $program_list = query($sql_program);
             </div>
         </div>
         
-       <!-- KOLOM KANAN: DONASI -->
-<div class="donasi-section">
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-hand-holding-heart"></i> Donasi Cepat</h2>
-            <p>Isi nama Anda (opsional) - jika kosong akan tercatat sebagai "Hamba Allah"</p>
-        </div>
-        <div class="card-body">
-            <?php if ($donasi_success): ?>
-                <div class="alert alert-success"><?php echo $donasi_success; ?></div>
-            <?php endif; ?>
-            <?php if ($donasi_error): ?>
-                <div class="alert alert-error"><?php echo $donasi_error; ?></div>
-            <?php endif; ?>
-            
-            <form method="POST" enctype="multipart/form-data">
-                <!-- FORM 2 KOLOM -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    
-                    <!-- KOLOM KIRI -->
-                    <div>
-                        <div class="form-group">
-                            <label>Nama Donatur (Opsional)</label>
-                            <input type="text" name="nama_donatur" placeholder="Kosongkan jika ingin anonim">
-                            <small style="color:#888;">Nama akan tercatat sesuai isian</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Nominal Donasi (Rp)</label>
-                            <input type="number" name="nominal" placeholder="Masukkan nominal" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Kategori Donasi</label>
-                            <select name="kategori_id" required>
-                                <option value="">Pilih Kategori</option>
-                                <?php foreach ($kategoris as $k): ?>
-                                    <option value="<?php echo $k['id']; ?>"><?php echo $k['nama_kategori']; ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Upload Bukti Transfer</label>
-                            <input type="file" name="bukti_transfer" accept="image/*,application/pdf" required>
-                            <small style="color:#888;">Format: JPG, PNG, PDF</small>
-                        </div>
-                    </div>
-                    
-                    <!-- KOLOM KANAN -->
-                    <div>
-                        <div class="form-group">
-                            <label>Keterangan (Opsional)</label>
-                            <textarea name="keterangan" rows="2" placeholder="Catatan donasi..."></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Titip Doa (Opsional)</label>
-                            <textarea name="catatan_doa" rows="2" placeholder="Tulis doa atau pesan..."></textarea>
-                        </div>
-                        
-                        <!-- QRIS DIPINDAHKAN KE SINI -->
-                        <div class="qris-image" style="margin-top: 10px;">
-                            <p style="font-size: 11px; color: #888; margin-bottom: 8px;">
-                                <i class="fas fa-qrcode"></i> Scan QRIS
-                            </p>
-                            <img src="assets/image/qris.jpeg" alt="QRIS" style="width: 100px; border-radius: 10px;" onerror="this.src='assets/image/almuthi.png'">
-                            <p style="font-size: 10px; color: #888; margin-top: 8px;">
-                                BRI: 0821-3191-3839-9383-92
-                            </p>
-                        </div>
-                    </div>
+        <!-- KOLOM KANAN: DONASI -->
+        <div class="donasi-section">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-hand-holding-heart"></i> Donasi Cepat</h2>
+                    <p>Donasi tanpa login - cukup isi data Anda</p>
                 </div>
-                
-                <button type="submit" name="donasi" class="btn-donasi" style="margin-top: 10px; width: 100%;">
-                    <i class="fas fa-paper-plane"></i> Kirim Donasi
-                </button>
-            </form>
+                <div class="card-body">
+                    <?php if ($donasi_success): ?>
+                        <div class="alert alert-success"><?php echo $donasi_success; ?></div>
+                    <?php endif; ?>
+                    <?php if ($donasi_error): ?>
+                        <div class="alert alert-error"><?php echo $donasi_error; ?></div>
+                    <?php endif; ?>
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        <!-- FORM 2 KOLOM -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            
+                            <!-- KOLOM KIRI -->
+                            <div>
+                                <div class="form-group">
+                                    <label>Nama Donatur (Opsional)</label>
+                                    <input type="text" name="nama_donatur" placeholder="Kosongkan jika ingin anonim">
+                                    <small style="color:#888;">Nama akan tercatat sesuai isian</small>
+                                </div>
+                                
+                                <!-- ====================================================== -->
+                                <!-- TAMBAHAN: No WhatsApp WAJIB                           -->
+                                <!-- ====================================================== -->
+                                <div class="form-group">
+                                    <label>No. WhatsApp <span class="required">*</span></label>
+                                    <input type="text" name="no_whatsapp" placeholder="Contoh: 08123456789" required>
+                                    <small style="color:#888;">Wajib diisi untuk konfirmasi donasi dan riwayat donasi Anda</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Nominal Donasi (Rp)</label>
+                                    <input type="number" name="nominal" placeholder="Masukkan nominal" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Kategori Donasi</label>
+                                    <select name="kategori_id" required>
+                                        <option value="">Pilih Kategori</option>
+                                        <?php foreach ($kategoris as $k): ?>
+                                            <option value="<?php echo $k['id']; ?>"><?php echo $k['nama_kategori']; ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Upload Bukti Transfer</label>
+                                    <input type="file" name="bukti_transfer" accept="image/*,application/pdf" required>
+                                    <small style="color:#888;">Format: JPG, PNG, PDF</small>
+                                </div>
+                            </div>
+                            
+                            <!-- KOLOM KANAN -->
+                            <div>
+                                <div class="form-group">
+                                    <label>Keterangan (Opsional)</label>
+                                    <textarea name="keterangan" rows="2" placeholder="Catatan donasi..."></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Titip Doa (Opsional)</label>
+                                    <textarea name="catatan_doa" rows="2" placeholder="Tulis doa atau pesan..."></textarea>
+                                </div>
+                                
+                                <!-- QRIS -->
+                                <div class="qris-image">
+                                    <p style="font-size: 11px; color: #888; margin-bottom: 8px;">
+                                        <i class="fas fa-qrcode"></i> Scan QRIS
+                                    </p>
+                                    <img src="assets/image/qris.jpeg" alt="QRIS" onerror="this.src='assets/image/almuthi.png'">
+                                    <p style="font-size: 10px; color: #888; margin-top: 8px;">
+                                        BRI: 0821-3191-3839-9383-92
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" name="donasi" class="btn-donasi" style="margin-top: 10px; width: 100%;">
+                            <i class="fas fa-paper-plane"></i> Kirim Donasi
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
         
     </div>
     
     <!-- ====================================================== -->
-    <!-- PROGRAM KAMI (CROWDFUNDING) - DITARUH DI BAWAH MAIN-LAYOUT -->
+    <!-- PROGRAM KAMI (CROWDFUNDING)                            -->
     <!-- ====================================================== -->
     <div class="program-section">
         <div class="program-header">
@@ -716,10 +752,10 @@ $program_list = query($sql_program);
         <div class="program-grid">
             <?php if (count($program_list) > 0): ?>
                 <?php foreach ($program_list as $program):
-    $terkumpul = $program['total_terkumpul'] ?? 0;
-    $persen = ($program['target_nominal'] > 0) ? round(($terkumpul / $program['target_nominal']) * 100) : 0;
-    $persen = min($persen, 100);
-?>
+                    $terkumpul = $program['total_terkumpul'] ?? 0;
+                    $persen = ($program['target_nominal'] > 0) ? round(($terkumpul / $program['target_nominal']) * 100) : 0;
+                    $persen = min($persen, 100);
+                ?>
                 <div class="program-card">
                     <div class="program-icon">
                         <?php if ($program['gambar']): ?>
@@ -794,7 +830,7 @@ $program_list = query($sql_program);
         </div>
     </div>
     
-    <div class="info-text" style="text-align: center; font-size: 11px; color: #888; margin-top: 20px; padding: 15px;">
+    <div class="info-text">
         © 2025 Panti Asuhan Al-Muthi | Lembaga Amil Zakat Nasional
     </div>
 </div>

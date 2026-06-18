@@ -1,7 +1,7 @@
 <?php
 // ======================================================
 // FILE: admin/program.php
-// HALAMAN KELOLA PROGRAM UTAMA (CRUD)
+// HALAMAN KELOLA PROGRAM UTAMA (CRUD) - PERBAIKAN
 // ======================================================
 
 require_once '../config/database.php';
@@ -131,7 +131,17 @@ $total_result = mysqli_query($conn, $total_sql);
 $total_rows = mysqli_fetch_assoc($total_result)['total'];
 $total_pages = ceil($total_rows / $limit);
 
-$sql = "SELECT * FROM program_donasi ORDER BY created_at DESC LIMIT $offset, $limit";
+// ======================================================
+// QUERY PROGRAM DENGAN TOTAL TERKUMPUL
+// ======================================================
+$sql = "SELECT 
+            p.*,
+            COALESCE((SELECT SUM(nominal) FROM donasi_program WHERE program_id = p.id AND status = 'success'), 0) as terkumpul,
+            COALESCE((SELECT COUNT(*) FROM donasi_program WHERE program_id = p.id AND status = 'success'), 0) as jumlah_donatur,
+            COALESCE((SELECT SUM(jumlah) FROM penerima_manfaat WHERE program_id = p.id), 0) as tersalurkan
+        FROM program_donasi p 
+        ORDER BY p.created_at DESC 
+        LIMIT $offset, $limit";
 $programs = query($sql);
 
 $success = $_SESSION['success'] ?? '';
@@ -180,19 +190,21 @@ unset($_SESSION['success'], $_SESSION['error']);
         .content-card { background: white; border-radius: 20px; padding: 25px; margin-bottom: 20px; }
         .btn-tambah { background: #50c878; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 20px; }
         
-        .program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
         .program-card { background: #f8f9fa; border-radius: 15px; padding: 15px; border: 1px solid #e0e0e0; transition: transform 0.3s; }
         .program-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .program-card img { width: 100%; height: 160px; object-fit: cover; border-radius: 10px; margin-bottom: 10px; }
         .program-card h3 { font-size: 16px; margin-bottom: 5px; }
         .program-card .target { font-size: 12px; color: #666; margin-bottom: 8px; }
-        .progress-bar { background: #e0e0e0; border-radius: 10px; height: 8px; margin: 10px 0; }
-        .progress-fill { background: #50c878; height: 100%; border-radius: 10px; }
+        .progress-bar { background: #e0e0e0; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
+        .progress-fill { background: #50c878; height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+        .progress-fill.done { background: #2196f3; }
         .btn-action { padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; margin: 2px; }
         .btn-edit { background: #ffc107; color: #333; }
         .btn-delete { background: #dc3545; color: white; }
         .btn-penerima { background: #17a2b8; color: white; }
         .btn-galeri { background: #6c757d; color: white; }
+        .btn-donasi { background: #9c27b0; color: white; }
         
         .alert { padding: 12px; border-radius: 10px; margin-bottom: 20px; }
         .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
@@ -213,6 +225,11 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-save { background: #50c878; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
         .btn-cancel { background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
         
+        .status-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; display: inline-block; }
+        .status-aktif { background: #e8f5e9; color: #4caf50; }
+        .status-selesai { background: #e3f2fd; color: #2196f3; }
+        .status-ditutup { background: #ffebee; color: #f44336; }
+        
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
@@ -229,10 +246,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="submenu">
                 <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
                 <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-                    <div class="submenu-item" onclick="location.href='verifikasi_program.php'">
-    <i class="fas fa-heart"></i>
-    <span>Verifikasi Program</span>
-</div>
+                <div class="submenu-item" onclick="location.href='verifikasi_program.php'"><i class="fas fa-heart"></i><span>Verifikasi Program</span></div>
                 <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
             </div>
             <div class="menu-item has-submenu open" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
@@ -276,6 +290,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                     <?php foreach ($programs as $p): 
                         $persen = ($p['target_nominal'] > 0) ? round(($p['terkumpul'] / $p['target_nominal']) * 100) : 0;
                         $persen = min($persen, 100);
+                        $statusClass = 'status-' . $p['status'];
                     ?>
                         <div class="program-card">
                             <?php if ($p['gambar']): ?>
@@ -286,15 +301,24 @@ unset($_SESSION['success'], $_SESSION['error']);
                                 </div>
                             <?php endif; ?>
                             <h3><?php echo htmlspecialchars($p['nama_program']); ?></h3>
+                            <div class="target">
+                                <span class="status-badge <?php echo $statusClass; ?>"><?php echo ucfirst($p['status']); ?></span>
+                            </div>
                             <div class="target">Target: Rp <?php echo number_format($p['target_nominal'], 0, ',', '.'); ?></div>
-                            <div class="target">Terkumpul: Rp <?php echo number_format($p['terkumpul'], 0, ',', '.'); ?></div>
-                            <div class="progress-bar"><div class="progress-fill" style="width: <?php echo $persen; ?>%;"></div></div>
-                            <div class="target" style="color: #888;">Status: <?php echo ucfirst($p['status']); ?></div>
-                            <div style="margin-top: 10px;">
+                            <div class="target">Terkumpul: Rp <?php echo number_format($p['terkumpul'], 0, ',', '.'); ?> (<?php echo $p['jumlah_donatur']; ?> donatur)</div>
+                            <div class="target">Tersalurkan: Rp <?php echo number_format($p['tersalurkan'], 0, ',', '.'); ?></div>
+                            <div class="progress-bar">
+                                <div class="progress-fill <?php echo $persen >= 100 ? 'done' : ''; ?>" style="width: <?php echo $persen; ?>%;"></div>
+                            </div>
+                            <div class="target" style="color: <?php echo $persen >= 100 ? '#2196f3' : '#888'; ?>;">
+                                <?php echo $persen; ?>% tercapai
+                            </div>
+                            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px;">
                                 <button class="btn-action btn-edit" onclick="openEditModal(<?php echo $p['id']; ?>)"><i class="fas fa-edit"></i> Edit</button>
                                 <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i> Hapus</button>
                                 <button class="btn-action btn-penerima" onclick="location.href='program_penerima.php?program_id=<?php echo $p['id']; ?>'"><i class="fas fa-users"></i> Penerima</button>
                                 <button class="btn-action btn-galeri" onclick="location.href='program_galeri.php?program_id=<?php echo $p['id']; ?>'"><i class="fas fa-images"></i> Galeri</button>
+                                <button class="btn-action btn-donasi" onclick="location.href='verifikasi_program.php?program_id=<?php echo $p['id']; ?>'"><i class="fas fa-hand-holding-heart"></i> Donasi</button>
                             </div>
                         </div>
                     <?php endforeach; ?>

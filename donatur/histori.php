@@ -21,31 +21,57 @@ if (isset($_GET['hapus'])) {
     $tipe = isset($_GET['tipe']) ? $_GET['tipe'] : 'biasa';
     
     if ($tipe == 'biasa') {
-    // Hapus donasi biasa
-    $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi WHERE id = $id AND user_id = " . $currentUser['id']);
-    $data = mysqli_fetch_assoc($check);
-    
-    if ($data && in_array($data['status'], ['pending', 'failed'])) {
-        // Hapus dulu relasi di donasi_program (jika ada)
-        mysqli_query($conn, "DELETE FROM donasi_program WHERE donasi_id = $id");
+        // ======================================================
+        // HAPUS DONASI BIASA
+        // ======================================================
+        $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi WHERE id = $id AND user_id = " . $currentUser['id']);
+        $data = mysqli_fetch_assoc($check);
         
-        if ($data['bukti_transfer'] && file_exists('../assets/uploads/bukti_transfer/' . $data['bukti_transfer'])) {
-            unlink('../assets/uploads/bukti_transfer/' . $data['bukti_transfer']);
-        }
-        $sql = "DELETE FROM donasi WHERE id = $id";
-        if (mysqli_query($conn, $sql)) {
-            logActivity($currentUser['id'], "Menghapus donasi biasa ID: $id");
-            $_SESSION['success'] = "Donasi berhasil dihapus!";
+        if ($data && in_array($data['status'], ['pending', 'failed'])) {
+            // Hapus dulu relasi di donasi_program (jika ada)
+            mysqli_query($conn, "DELETE FROM donasi_program WHERE donasi_id = $id");
+            
+            if ($data['bukti_transfer'] && file_exists('../assets/uploads/bukti_transfer/' . $data['bukti_transfer'])) {
+                unlink('../assets/uploads/bukti_transfer/' . $data['bukti_transfer']);
+            }
+            $sql = "DELETE FROM donasi WHERE id = $id";
+            if (mysqli_query($conn, $sql)) {
+                logActivity($currentUser['id'], "Menghapus donasi biasa ID: $id");
+                $_SESSION['success'] = "Donasi berhasil dihapus!";
+            } else {
+                $_SESSION['error'] = "Gagal menghapus donasi!";
+            }
         } else {
-            $_SESSION['error'] = "Gagal menghapus donasi!";
+            $_SESSION['error'] = "Donasi yang sudah sukses tidak bisa dihapus!";
         }
-    } else {
-        $_SESSION['error'] = "Donasi yang sudah sukses tidak bisa dihapus!";
+        
+    } elseif ($tipe == 'program') {
+        // ======================================================
+        // HAPUS DONASI PROGRAM
+        // ======================================================
+        $check = mysqli_query($conn, "SELECT status, bukti_transfer FROM donasi_program WHERE id = $id AND user_id = " . $currentUser['id']);
+        $data = mysqli_fetch_assoc($check);
+        
+        if ($data && in_array($data['status'], ['pending', 'failed'])) {
+            if ($data['bukti_transfer'] && file_exists('../assets/uploads/bukti_transfer/' . $data['bukti_transfer'])) {
+                unlink('../assets/uploads/bukti_transfer/' . $data['bukti_transfer']);
+            }
+            $sql = "DELETE FROM donasi_program WHERE id = $id";
+            if (mysqli_query($conn, $sql)) {
+                logActivity($currentUser['id'], "Menghapus donasi program ID: $id");
+                $_SESSION['success'] = "Donasi program berhasil dihapus!";
+            } else {
+                $_SESSION['error'] = "Gagal menghapus donasi program!";
+            }
+        } else {
+            $_SESSION['error'] = "Donasi program yang sudah sukses tidak bisa dihapus!";
+        }
     }
-}
+    
     header("Location: histori.php");
     exit();
 }
+
 
 // ======================================================
 // FILTER & PAGINATION

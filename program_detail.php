@@ -3,6 +3,7 @@
 // FILE: program_detail.php
 // HALAMAN DETAIL PROGRAM + FORM DONASI
 // DENGAN 2 TAMPILAN: PUBLIK (BG HIJAU) & DONATUR LOGIN (SIDEBAR)
+// PERBAIKAN: No WhatsApp untuk donatur login READONLY
 // ======================================================
 
 require_once 'config/database.php';
@@ -43,61 +44,80 @@ $sql_tersalurkan = "SELECT SUM(jumlah) as total FROM penerima_manfaat WHERE prog
 $result_tersalurkan = mysqli_query($conn, $sql_tersalurkan);
 $total_tersalurkan = mysqli_fetch_assoc($result_tersalurkan)['total'] ?? 0;
 
-// Proses Donasi Program
+// Proses Donasi Program - PERBAIKAN
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['donasi_program'])) {
     $nama_donatur = mysqli_real_escape_string($conn, $_POST['nama_donatur']);
+    // SETELAH PERBAIKAN
+$no_whatsapp = isset($_POST['no_whatsapp']) ? mysqli_real_escape_string($conn, $_POST['no_whatsapp']) : '';
     $is_anonim = isset($_POST['is_anonim']) ? (int)$_POST['is_anonim'] : 0;
     $nominal = (float)$_POST['nominal'];
     $pesan = mysqli_real_escape_string($conn, $_POST['pesan']);
     
-    // Upload bukti transfer
-    $bukti_transfer = null;
-    if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($_FILES['bukti_transfer']['name'], PATHINFO_EXTENSION);
-        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $filename = 'donasi_program_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
-            $target = 'assets/uploads/bukti_transfer/' . $filename;
-            if (move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $target)) {
-                $bukti_transfer = $filename;
+    // ======================================================
+    // VALIDASI: No WhatsApp WAJIB diisi (kecuali user login)
+    // ======================================================
+    if (empty($no_whatsapp) && !$is_donatur_login) {
+        $error = "Nomor WhatsApp wajib diisi untuk konfirmasi donasi!";
+    } else {
+        // Upload bukti transfer
+        $bukti_transfer = null;
+        if (isset($_FILES['bukti_transfer']) && $_FILES['bukti_transfer']['error'] === UPLOAD_ERR_OK) {
+            $ext = pathinfo($_FILES['bukti_transfer']['name'], PATHINFO_EXTENSION);
+            $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+            
+            if (in_array(strtolower($ext), $allowed)) {
+                $filename = 'donasi_program_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+                $target = 'assets/uploads/bukti_transfer/' . $filename;
+                if (move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $target)) {
+                    $bukti_transfer = $filename;
+                }
             }
         }
-    }
-    
-    $nama_donatur_final = ($is_anonim == 1) ? 'Hamba Allah' : ($nama_donatur ?: 'Hamba Allah');
-    
-    // Jika user login
-    if (isLoggedIn() && getUserRole() == 'donatur') {
-        $user_id = $_SESSION['user_id'];
         
-        // ======================================================
-        // HANYA SIMPAN KE DONASI_PROGRAM (TIDAK KE DONASI)
-        // ======================================================
-        $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
-                VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
+        $nama_donatur_final = ($is_anonim == 1) ? 'Hamba Allah' : ($nama_donatur ?: 'Hamba Allah');
         
-    } else {
-        // Donatur tidak login
-        $user_check = mysqli_query($conn, "SELECT id FROM users WHERE nama_lengkap = '$nama_donatur_final' AND role_id = 3");
-        if (mysqli_num_rows($user_check) > 0) {
-            $user_id = mysqli_fetch_assoc($user_check)['id'];
+        // Jika user login
+        if ($is_donatur_login) {
+            $user_id = $_SESSION['user_id'];
+            
+            $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
+                    VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
+            
         } else {
-            $username = strtolower(str_replace(' ', '_', $nama_donatur_final)) . '_' . rand(100, 999);
-            $hash_password = password_hash('donasi123', PASSWORD_DEFAULT);
-            mysqli_query($conn, "INSERT INTO users (username, password, nama_lengkap, role_id, is_active) 
-                                 VALUES ('$username', '$hash_password', '$nama_donatur_final', 3, 1)");
-            $user_id = mysqli_insert_id($conn);
+            // ======================================================
+            // Donatur tidak login - CEK BERDASARKAN NO WHATSAPP
+            // ======================================================
+            $user_check = mysqli_query($conn, "SELECT id FROM users WHERE no_whatsapp = '$no_whatsapp' AND role_id = 3");
+            
+            if (mysqli_num_rows($user_check) > 0) {
+                // User ditemukan, pakai user yang sudah ada
+                $user_data = mysqli_fetch_assoc($user_check);
+                $user_id = $user_data['id'];
+            } else {
+                // ======================================================
+                // BUAT USER BARU dengan no_whatsapp
+                // ======================================================
+                $username = strtolower(str_replace(' ', '_', $nama_donatur_final)) . '_' . rand(100, 999);
+                $hash_password = password_hash('donasi123', PASSWORD_DEFAULT);
+                $foto_default = 'default-user.png';
+                
+                mysqli_query($conn, "INSERT INTO users (username, password, nama_lengkap, role_id, is_active, foto_profil, no_whatsapp) 
+                                     VALUES ('$username', '$hash_password', '$nama_donatur_final', 3, 1, '$foto_default', '$no_whatsapp')");
+                $user_id = mysqli_insert_id($conn);
+            }
+            
+            // ======================================================
+            // SIMPAN DONASI PROGRAM
+            // ======================================================
+            $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
+                    VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
         }
         
-        $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
-                VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
-    }
-    
-    if (mysqli_query($conn, $sql)) {
-        $success = "Donasi berhasil dikirim! Menunggu verifikasi admin.";
-    } else {
-        $error = "Gagal mengirim donasi: " . mysqli_error($conn);
+        if (mysqli_query($conn, $sql)) {
+            $success = "Donasi berhasil dikirim! Menunggu verifikasi admin.";
+        } else {
+            $error = "Gagal mengirim donasi: " . mysqli_error($conn);
+        }
     }
 }
 
@@ -281,19 +301,14 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
             </div>
             
             <div class="container-donatur">
-                <!-- PROGRAM HEADER (SAMA PERSIS) -->
+                <!-- PROGRAM HEADER -->
                 <div class="program-header">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 10px;">
-        <h1 class="program-title" style="margin-bottom: 0;"><?php echo $program['nama_program']; ?></h1>
-        <a href="semua_program.php" class="btn-back" style="margin-bottom: 0; white-space: nowrap; background: #6c757d; color: white; padding: 8px 20px; border-radius: 25px; text-decoration: none; font-size: 14px;"><i class="fas fa-arrow-left"></i> Kembali</a>
-    </div>
-    <p class="program-desc"><?php echo nl2br(htmlspecialchars($program['deskripsi'])); ?></p>
-    
-
-
-                       
-                      
-                   
+                        <h1 class="program-title" style="margin-bottom: 0;"><?php echo $program['nama_program']; ?></h1>
+                        <a href="semua_program.php" class="btn-back" style="margin-bottom: 0; white-space: nowrap; background: #6c757d; color: white; padding: 8px 20px; border-radius: 25px; text-decoration: none; font-size: 14px;"><i class="fas fa-arrow-left"></i> Kembali</a>
+                    </div>
+                    <p class="program-desc"><?php echo nl2br(htmlspecialchars($program['deskripsi'])); ?></p>
+                    
                     <div class="program-stats">
                         <div class="stat-box"><h3>Rp <?php echo number_format($terkumpul, 0, ',', '.'); ?></h3><p>Terkumpul</p></div>
                         <div class="stat-box"><h3>Rp <?php echo number_format($program['target_nominal'], 0, ',', '.'); ?></h3><p>Target</p></div>
@@ -305,7 +320,7 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                     <div style="text-align: right; font-size: 12px; margin-top: 5px;"><?php echo $persen; ?>% tercapai</div>
                 </div>
                 
-                <!-- MAIN CONTENT (SAMA PERSIS) -->
+                <!-- MAIN CONTENT -->
                 <div class="main-content">
                     
                     <!-- FORM DONASI -->
@@ -336,8 +351,18 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                                 
                                 <div class="form-group" id="nama_field">
                                     <label>Nama (jika ditampilkan)</label>
-                                    <input type="text" name="nama_donatur" placeholder="Masukkan nama Anda">
+                                    <input type="text" name="nama_donatur" placeholder="Masukkan nama Anda" value="<?php echo htmlspecialchars($currentUser['nama_lengkap']); ?>">
                                 </div>
+                                
+                                <!-- ====================================================== -->
+                                <!-- UNTUK DONATUR LOGIN: NO WHATSAPP READONLY              -->
+                                <!-- ====================================================== -->
+                                <div class="form-group">
+                                    <label>No. WhatsApp Terdaftar</label>
+                                    <input type="text" value="<?php echo htmlspecialchars($currentUser['no_whatsapp'] ?? '-'); ?>" disabled style="background:#f5f5f5;">
+                                    <small style="color:#888;">Nomor WhatsApp yang terdaftar di akun Anda</small>
+                                </div>
+                                <input type="hidden" name="no_whatsapp" value="<?php echo htmlspecialchars($currentUser['no_whatsapp'] ?? ''); ?>">
                                 
                                 <div class="form-group">
                                     <label>Pesan (Opsional)</label>
@@ -486,7 +511,6 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
             .btn-back { display: inline-block; background: #6c757d; color: white; padding: 10px 20px; border-radius: 25px; text-decoration: none; margin-bottom: 20px; font-size: 14px; }
             .btn-back:hover { background: #5a6268; }
             
-            /* PROGRAM HEADER */
             .program-header { background: white; border-radius: 20px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
             .program-title { font-size: 24px; color: #1a3a2a; margin-bottom: 10px; }
             .program-desc { color: #666; margin-bottom: 20px; line-height: 1.6; }
@@ -497,7 +521,6 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
             .progress-bar { background: #e0e0e0; border-radius: 10px; height: 10px; overflow: hidden; }
             .progress-fill { background: #50c878; height: 100%; width: 0%; transition: width 0.5s ease; }
             
-            /* MAIN CONTENT */
             .main-content { display: flex; gap: 30px; flex-wrap: wrap; }
             .donasi-form { flex: 1; min-width: 300px; }
             .donatur-list { flex: 1; min-width: 300px; }
@@ -568,7 +591,6 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
     <div class="container">
         <a href="semua_program.php" class="btn-back"><i class="fas fa-arrow-left"></i> Kembali</a>
         
-        <!-- PROGRAM HEADER -->
         <div class="program-header">
             <h1 class="program-title"><?php echo $program['nama_program']; ?></h1>
             <p class="program-desc"><?php echo nl2br(htmlspecialchars($program['deskripsi'])); ?></p>
@@ -584,7 +606,6 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
             <div style="text-align: right; font-size: 12px; margin-top: 5px;"><?php echo $persen; ?>% tercapai</div>
         </div>
         
-        <!-- MAIN CONTENT -->
         <div class="main-content">
             
             <!-- FORM DONASI -->
@@ -613,6 +634,15 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                             </div>
                         </div>
                         
+                        <!-- ====================================================== -->
+                        <!-- UNTUK PUBLIK: NO WHATSAPP WAJIB                       -->
+                        <!-- ====================================================== -->
+                        <div class="form-group">
+                            <label>No. WhatsApp <span style="color:red;">*</span></label>
+                            <input type="text" name="no_whatsapp" placeholder="Contoh: 08123456789" required>
+                            <small style="color:#888;">Wajib diisi untuk konfirmasi donasi dan riwayat donasi Anda</small>
+                        </div>
+                        
                         <div class="form-group" id="nama_field">
                             <label>Nama (jika ditampilkan)</label>
                             <input type="text" name="nama_donatur" placeholder="Masukkan nama Anda">
@@ -629,7 +659,6 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                             <small style="color:#888;">Format: JPG, PNG, PDF (Max 2MB)</small>
                         </div>
                         
-                        <!-- QRIS & REKENING -->
                         <div class="qris-info">
                             <p style="font-size: 12px; color: #888; margin-bottom: 10px;">
                                 <i class="fas fa-qrcode"></i> Scan QRIS untuk donasi cepat
