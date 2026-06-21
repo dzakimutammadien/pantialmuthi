@@ -64,7 +64,9 @@ function uploadBukti($existing_file = null) {
     return ['success' => true, 'filename' => $existing_file];
 }
 
-// Proses Update
+// ======================================================
+// PROSES UPDATE - PERBAIKAN
+// ======================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $kategori_id = (int)$_POST['kategori_id'];
     $nominal = (float)$_POST['nominal'];
@@ -75,17 +77,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $upload = uploadBukti($donasi['bukti_transfer']);
     $bukti_transfer = $upload['success'] ? $upload['filename'] : $donasi['bukti_transfer'];
     
+    // ======================================================
+    // UPDATE + RESET STATUS KE PENDING (TANPA KOMENTAR)
+    // ======================================================
     $sql_update = "UPDATE donasi SET 
                    kategori_id = $kategori_id,
                    nominal = $nominal,
                    keterangan = '$keterangan',
                    catatan_doa = '$catatan_doa',
-                   bukti_transfer = '$bukti_transfer'
+                   bukti_transfer = '$bukti_transfer',
+                   status = 'pending',
+                   verified_by = NULL,
+                   verified_at = NULL,
+                   catatan_verifikasi = NULL
                    WHERE id = $id AND user_id = " . $currentUser['id'];
     
     if (mysqli_query($conn, $sql_update)) {
-        logActivity($currentUser['id'], "Mengedit donasi biasa ID: $id");
-        $_SESSION['success'] = "Donasi berhasil diupdate!";
+        logActivity($currentUser['id'], "Mengedit donasi biasa ID: $id (status direset ke pending)");
+        $_SESSION['success'] = "Donasi berhasil diupdate! Menunggu verifikasi ulang admin.";
         header('Location: histori.php');
         exit();
     } else {
@@ -109,7 +118,6 @@ unset($_SESSION['success']);
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
         
-        /* SIDEBAR */
         .sidebar {
             position: fixed;
             left: 0;
@@ -150,10 +158,8 @@ unset($_SESSION['success']);
         .menu-item i { width: 24px; font-size: 18px; }
         .menu-item span { font-size: 14px; }
         
-        /* MAIN CONTENT */
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
         
-        /* TOPBAR */
         .topbar {
             background: white;
             border-radius: 15px;
@@ -206,7 +212,6 @@ unset($_SESSION['success']);
             border-bottom: 1px solid #f0f0f0;
         }
         
-        /* CONTENT */
         .content-card {
             background: white;
             border-radius: 20px;
@@ -337,7 +342,7 @@ unset($_SESSION['success']);
             <img src="../assets/image/almuthi.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
             <div><h3>Panti Asuhan</h3><p>Al-Muthi</p></div>
         </div>
-         <div class="sidebar-menu">
+        <div class="sidebar-menu">
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
             <div class="menu-item" onclick="location.href='donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
             <div class="menu-item" onclick="location.href='../semua_program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
