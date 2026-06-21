@@ -631,11 +631,13 @@ $program_list = query($sql_program);
                     </form>
                     
                     <div class="register-info">
-                        <i class="fas fa-user-plus"></i> Belum punya akun? 
-                        <a href="https://wa.me/6282331696669?text=Saya%20ingin%20mendaftar%20akun%20donatur" target="_blank">
-                            Hubungi Admin via WhatsApp
-                        </a>
-                    </div>
+    <i class="fas fa-user-plus"></i> Belum punya akun? 
+    <a href="daftar.php">
+        <i class="fas fa-arrow-right"></i> Daftar di sini
+    </a>
+    <br>
+    <small style="color:#888;">Pendaftaran akan diverifikasi oleh Admin</small>
+</div>
                     
                     <div class="demo-credentials">
                         <strong>🔐 Demo Akun:</strong><br>
@@ -831,7 +833,7 @@ $program_list = query($sql_program);
     </div>
     
     <div class="info-text">
-        © 2025 Panti Asuhan Al-Muthi | Lembaga Amil Zakat Nasional
+        © 2025 Panti Asuhan Al-Muthi | Lembaga Kesejahteraan Sosial Anak
     </div>
 </div>
 </body>

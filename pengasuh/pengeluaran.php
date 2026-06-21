@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: pengasuh/pengeluaran.php
 // HALAMAN PENGELUARAN PANTI UNTUK PENGASUH
+// PERBAIKAN: Edit otomatis reset status ke PENDING
 // ======================================================
 
 require_once '../config/database.php';
@@ -57,7 +58,7 @@ if (isset($_POST['tambah'])) {
     
     if (mysqli_query($conn, $sql)) {
         logActivity($currentUser['id'], "Menambah pengeluaran: Rp " . number_format($nominal));
-        $_SESSION['success'] = "Pengeluaran berhasil ditambahkan!";
+        $_SESSION['success'] = "Pengeluaran berhasil ditambahkan! Menunggu verifikasi admin.";
     } else {
         $_SESSION['error'] = "Gagal menambahkan: " . mysqli_error($conn);
     }
@@ -67,6 +68,7 @@ if (isset($_POST['tambah'])) {
 
 // ======================================================
 // EDIT PENGELUARAN (Hanya milik sendiri & status pending/ditolak)
+// PERBAIKAN: Reset status ke PENDING setelah diedit
 // ======================================================
 if (isset($_POST['edit'])) {
     $id = (int)$_POST['id'];
@@ -87,17 +89,24 @@ if (isset($_POST['edit'])) {
         $upload = uploadGambar($data['bukti_foto']);
         $gambar = $upload['success'] ? $upload['filename'] : $data['bukti_foto'];
         
+        // ======================================================
+        // PERBAIKAN: Reset status ke PENDING setelah diedit
+        // ======================================================
         $sql = "UPDATE pengeluaran SET 
                 tanggal_pengeluaran = '$tanggal_pengeluaran',
                 kategori_id = $kategori_id,
                 nominal = $nominal,
                 deskripsi = '$deskripsi',
-                bukti_foto = '$gambar'
+                bukti_foto = '$gambar',
+                status = 'pending',
+                verified_by = NULL,
+                verified_at = NULL,
+                catatan_verifikasi = NULL
                 WHERE id = $id";
         
         if (mysqli_query($conn, $sql)) {
-            logActivity($currentUser['id'], "Mengedit pengeluaran ID: $id");
-            $_SESSION['success'] = "Pengeluaran berhasil diupdate!";
+            logActivity($currentUser['id'], "Mengedit pengeluaran ID: $id (status direset ke pending)");
+            $_SESSION['success'] = "Pengeluaran berhasil diupdate! Menunggu verifikasi ulang admin.";
         } else {
             $_SESSION['error'] = "Gagal mengupdate: " . mysqli_error($conn);
         }
@@ -198,6 +207,7 @@ unset($_SESSION['success'], $_SESSION['error']);
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
+        
         .sidebar {
             position: fixed;
             left: 0;
@@ -220,11 +230,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             gap: 12px;
             justify-content: center;
         }
-        .page-title p {
-            font-size: 13px;
-            color: #888;
-            margin-top: 5px;
-        }
+        
         .sidebar-logo {
             width: 45px;
             height: 45px;
@@ -269,59 +275,369 @@ unset($_SESSION['success'], $_SESSION['error']);
         .menu-item span {
             font-size: 14px;
         }
-        .main-content { margin-left: 280px; padding: 20px; }
-        .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .page-title h2 { font-size: 20px; color: #333; }
-        .profile-dropdown { position: relative; }
-        .profile-icon { width: 45px; height: 45px; background: linear-gradient(135deg, #50c878, #2e8b57); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: white; }
-        .dropdown-menu { position: absolute; top: 55px; right: 0; background: white; border-radius: 12px; width: 200px; opacity: 0; visibility: hidden; transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
-        .profile-dropdown:hover .dropdown-menu { opacity: 1; visibility: visible; }
-        .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
-        .content-card { background: white; border-radius: 20px; padding: 25px; }
-        .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; }
-        .filter-section input { flex: 2; }
-        .filter-section select { flex: 1; }
-        .btn-filter, .btn-reset, .btn-tambah { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
-        .btn-filter { background: #50c878; color: white; }
-        .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
-        .btn-tambah { background: #50c878; color: white; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3e0; color: #ff9800; }
-        .status-disetujui { background: #e8f5e9; color: #4caf50; }
-        .status-ditolak { background: #ffebee; color: #f44336; }
-        .btn-action { padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer; margin: 2px; font-size: 12px; }
-        .btn-detail { background: #17a2b8; color: white; }
-        .btn-edit { background: #50c878; color: white; }
-        .btn-delete { background: #dc3545; color: white; }
-        .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
-        .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
-        .alert-error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
-        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
-        .pagination a, .pagination span { padding: 8px 14px; border-radius: 8px; text-decoration: none; }
-        .pagination a { background: #f0f2f5; color: #555; }
-        .pagination .active { background: #50c878; color: white; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 20px; width: 600px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .close-modal { font-size: 24px; cursor: pointer; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-save { background: #50c878; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
-        .btn-cancel { background: #6c757d; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
-        .detail-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
-        .detail-label { font-weight: 600; font-size: 12px; color: #888; margin-bottom: 5px; }
-        .detail-value { font-size: 14px; color: #333; }
-        .detail-image { text-align: center; margin: 15px 0; }
-        .detail-image img { max-width: 100%; max-height: 300px; border-radius: 10px; }
-        @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } .form-row { grid-template-columns: 1fr; } }
+        
+        .main-content { 
+            margin-left: 280px; 
+            padding: 20px; 
+            min-height: 100vh;
+        }
+        
+        .topbar { 
+            background: white; 
+            border-radius: 15px; 
+            padding: 15px 25px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 25px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+        }
+        
+        .page-title h2 { 
+            font-size: 20px; 
+            color: #333; 
+        }
+        
+        .page-title p {
+            font-size: 13px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .profile-dropdown { 
+            position: relative; 
+        }
+        
+        .profile-icon { 
+            width: 45px; 
+            height: 45px; 
+            background: linear-gradient(135deg, #50c878, #2e8b57); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            font-size: 20px; 
+            color: white; 
+        }
+        
+        .dropdown-menu { 
+            position: absolute; 
+            top: 55px; 
+            right: 0; 
+            background: white; 
+            border-radius: 12px; 
+            width: 200px; 
+            opacity: 0; 
+            visibility: hidden; 
+            transition: all 0.3s; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+            z-index: 1000; 
+        }
+        
+        .profile-dropdown:hover .dropdown-menu { 
+            opacity: 1; 
+            visibility: visible; 
+        }
+        
+        .dropdown-menu a { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            padding: 12px 20px; 
+            color: #333; 
+            text-decoration: none; 
+            border-bottom: 1px solid #f0f0f0; 
+        }
+        
+        .dropdown-menu a:hover { 
+            background: #f5f5f5; 
+            color: #50c878; 
+        }
+        
+        .content-card { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 25px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+        }
+        
+        .filter-section { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            flex-wrap: wrap; 
+            align-items: center; 
+        }
+        
+        .filter-section input, .filter-section select { 
+            padding: 10px 15px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 10px; 
+            font-size: 14px; 
+        }
+        
+        .filter-section input { 
+            flex: 2; 
+        }
+        
+        .filter-section select { 
+            flex: 1; 
+        }
+        
+        .btn-filter, .btn-reset, .btn-tambah { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: 500; 
+        }
+        
+        .btn-filter { 
+            background: #50c878; 
+            color: white; 
+        }
+        
+        .btn-reset { 
+            background: #6c757d; 
+            color: white; 
+            text-decoration: none; 
+            display: inline-block; 
+        }
+        
+        .btn-tambah { 
+            background: #50c878; 
+            color: white; 
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        
+        th { 
+            text-align: left; 
+            padding: 12px; 
+            background: #f8f9fa; 
+            font-size: 13px; 
+        }
+        
+        td { 
+            padding: 12px; 
+            border-bottom: 1px solid #eee; 
+            font-size: 13px; 
+        }
+        
+        .status-badge { 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 11px; 
+            font-weight: 500; 
+            display: inline-block; 
+        }
+        
+        .status-pending { 
+            background: #fff3e0; 
+            color: #ff9800; 
+        }
+        
+        .status-disetujui { 
+            background: #e8f5e9; 
+            color: #4caf50; 
+        }
+        
+        .status-ditolak { 
+            background: #ffebee; 
+            color: #f44336; 
+        }
+        
+        .btn-action { 
+            padding: 5px 10px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin: 2px; 
+            font-size: 12px; 
+        }
+        
+        .btn-detail { 
+            background: #17a2b8; 
+            color: white; 
+        }
+        
+        .btn-edit { 
+            background: #50c878; 
+            color: white; 
+        }
+        
+        .btn-delete { 
+            background: #dc3545; 
+            color: white; 
+        }
+        
+        .alert { 
+            padding: 12px 20px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+        }
+        
+        .alert-success { 
+            background: #e8f5e9; 
+            color: #2e7d32; 
+            border-left: 4px solid #4caf50; 
+        }
+        
+        .alert-error { 
+            background: #ffebee; 
+            color: #c62828; 
+            border-left: 4px solid #f44336; 
+        }
+        
+        .pagination { 
+            display: flex; 
+            justify-content: center; 
+            gap: 8px; 
+            margin-top: 20px; 
+        }
+        
+        .pagination a, .pagination span { 
+            padding: 8px 14px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+        }
+        
+        .pagination a { 
+            background: #f0f2f5; 
+            color: #555; 
+        }
+        
+        .pagination .active { 
+            background: #50c878; 
+            color: white; 
+        }
+        
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.5); 
+            z-index: 1000; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        
+        .modal.show { 
+            display: flex; 
+        }
+        
+        .modal-content { 
+            background: white; 
+            border-radius: 20px; 
+            width: 600px; 
+            max-width: 90%; 
+            padding: 25px; 
+            max-height: 90vh; 
+            overflow-y: auto; 
+        }
+        
+        .modal-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px; 
+        }
+        
+        .close-modal { 
+            font-size: 24px; 
+            cursor: pointer; 
+        }
+        
+        .form-group { 
+            margin-bottom: 15px; 
+        }
+        
+        .form-group label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 500; 
+            font-size: 13px; 
+        }
+        
+        .form-group input, .form-group select, .form-group textarea { 
+            width: 100%; 
+            padding: 10px 15px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 10px; 
+        }
+        
+        .form-row { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+        }
+        
+        .modal-footer { 
+            display: flex; 
+            justify-content: flex-end; 
+            gap: 10px; 
+            margin-top: 20px; 
+        }
+        
+        .btn-save { 
+            background: #50c878; 
+            color: white; 
+            padding: 10px 25px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+        }
+        
+        .btn-cancel { 
+            background: #6c757d; 
+            color: white; 
+            padding: 10px 25px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+        }
+        
+        .detail-item { 
+            margin-bottom: 15px; 
+            padding-bottom: 10px; 
+            border-bottom: 1px solid #f0f0f0; 
+        }
+        
+        .detail-label { 
+            font-weight: 600; 
+            font-size: 12px; 
+            color: #888; 
+            margin-bottom: 5px; 
+        }
+        
+        .detail-value { 
+            font-size: 14px; 
+            color: #333; 
+        }
+        
+        .detail-image { 
+            text-align: center; 
+            margin: 15px 0; 
+        }
+        
+        .detail-image img { 
+            max-width: 100%; 
+            max-height: 300px; 
+            border-radius: 10px; 
+        }
+        
+        @media (max-width: 768px) { 
+            .sidebar { left: -280px; } 
+            .main-content { margin-left: 0; } 
+            .form-row { grid-template-columns: 1fr; } 
+        }
     </style>
 </head>
 <body>
@@ -335,13 +651,8 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="menu-item active" onclick="location.href='pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
             <div class="menu-item" onclick="location.href='doa.php'"><i class="fas fa-pray"></i><span>Permohonan Khusus Do'a</span></div>
             <div class="menu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
-             <div class="menu-item" onclick="location.href='perkembangan.php'">
-                <i class="fas fa-seedling"></i>
-                <span>Perkembangan Anak</span>
-            </div>
-            
+            <div class="menu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
         </div>        
-        
     </div>
     
     <div class="main-content">
@@ -430,10 +741,10 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="form-row">
                     <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal_pengeluaran" required></div>
                     <div class="form-group"><label>Kategori</label><select name="kategori_id" required>
-    <?php foreach ($kategoris as $k): ?>
-        <option value="<?php echo $k['id']; ?>"><?php echo $k['nama_kategori']; ?></option>
-    <?php endforeach; ?>
-</select></div>
+                        <?php foreach ($kategoris as $k): ?>
+                            <option value="<?php echo $k['id']; ?>"><?php echo $k['nama_kategori']; ?></option>
+                        <?php endforeach; ?>
+                    </select></div>
                 </div>
                 <div class="form-group"><label>Jumlah (Rp)</label><input type="number" name="nominal" placeholder="0" required></div>
                 <div class="form-group"><label>Keterangan</label><textarea name="deskripsi" rows="3" placeholder="Deskripsi pengeluaran..."></textarea></div>
@@ -451,7 +762,11 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <input type="hidden" name="id" id="edit_id">
                 <div class="form-row">
                     <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal_pengeluaran" id="edit_tanggal" required></div>
-                    <div class="form-group"><label>Kategori</label><select name="kategori_id" id="edit_kategori" required><?php foreach ($kategoris as $k): ?><option value="<?php echo $k['id']; ?>"><?php echo $k['nama_kategori']; ?></option><?php endforeach; ?></select></div>
+                    <div class="form-group"><label>Kategori</label><select name="kategori_id" id="edit_kategori" required>
+                        <?php foreach ($kategoris as $k): ?>
+                            <option value="<?php echo $k['id']; ?>"><?php echo $k['nama_kategori']; ?></option>
+                        <?php endforeach; ?>
+                    </select></div>
                 </div>
                 <div class="form-group"><label>Jumlah (Rp)</label><input type="number" name="nominal" id="edit_nominal" required></div>
                 <div class="form-group"><label>Keterangan</label><textarea name="deskripsi" id="edit_deskripsi" rows="3"></textarea></div>

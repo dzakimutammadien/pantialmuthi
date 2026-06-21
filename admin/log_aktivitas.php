@@ -113,7 +113,15 @@ unset($_SESSION['success'], $_SESSION['error']);
         .submenu-item i { width: 20px; font-size: 14px; }
         .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
         .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
-        
+        .badge-pending {
+    background: #f44336;
+    color: white;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    margin-left: auto;
+        }
+
         /* MAIN CONTENT */
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
         
@@ -213,6 +221,16 @@ unset($_SESSION['success'], $_SESSION['error']);
                 </div>
                
             </div>
+              <div class="menu-item" onclick="location.href='verifikasi_pendaftaran.php'">
+    <i class="fas fa-user-check"></i>
+    <span>Verifikasi Akun</span>
+    <?php 
+    $pending_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM pendaftaran WHERE status = 'pending'"))['total'];
+    if ($pending_count > 0): 
+    ?>
+        <span class="badge-pending"><?php echo $pending_count; ?></span>
+    <?php endif; ?>
+</div>
         </div>
     </div>
     

@@ -2,7 +2,7 @@
 // ======================================================
 // FILE: donatur/laporan.php
 // HALAMAN LAPORAN KEUANGAN UNTUK DONATUR
-// DENGAN PENYALURAN PROGRAM
+// DENGAN PENYALURAN PROGRAM & PAGINATION
 // ======================================================
 
 require_once '../config/database.php';
@@ -60,9 +60,16 @@ $total_pengeluaran_all = $total_pengeluaran + $total_penyaluran;
 $saldo = $total_pemasukan - $total_pengeluaran_all;
 
 // ======================================================
-// RINCIAN TRANSAKSI (Donasi Biasa + Program + Pengeluaran + Penyaluran)
+// PAGINATION UNTUK RINCIAN TRANSAKSI
 // ======================================================
-$sql_rincian = "
+$limit_rincian = 20;
+$page_rincian = isset($_GET['page_rincian']) ? (int)$_GET['page_rincian'] : 1;
+$offset_rincian = ($page_rincian - 1) * $limit_rincian;
+
+// ======================================================
+// RINCIAN TRANSAKSI (dengan pagination)
+// ======================================================
+$sql_rincian_base = "
     (SELECT 
         tanggal_donasi as tanggal,
         'Pemasukan' as jenis,
@@ -137,7 +144,16 @@ $sql_rincian = "
     WHERE DATE(pm.tanggal_penyaluran) BETWEEN '$start_date' AND '$end_date')
     
     ORDER BY tanggal DESC
-    LIMIT 100";
+";
+
+// Hitung total data untuk pagination
+$count_sql = "SELECT COUNT(*) as total FROM ($sql_rincian_base) as total_data";
+$count_result = mysqli_query($conn, $count_sql);
+$total_rincian = mysqli_fetch_assoc($count_result)['total'];
+$total_pages_rincian = ceil($total_rincian / $limit_rincian);
+
+// Ambil data dengan LIMIT
+$sql_rincian = $sql_rincian_base . " LIMIT $offset_rincian, $limit_rincian";
 $rincian = query($sql_rincian);
 
 // ======================================================
@@ -258,6 +274,44 @@ $penyaluran_kategori = $penyaluran_kategori && $penyaluran_kategori['pengeluaran
         
         .section-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
         
+        /* PAGINATION STYLES */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .pagination a, .pagination span {
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .pagination a {
+            background: #f0f2f5;
+            color: #555;
+            border: 1px solid #e0e0e0;
+        }
+        .pagination a:hover {
+            background: #50c878;
+            color: white;
+            border-color: #50c878;
+        }
+        .pagination .active {
+            background: #50c878;
+            color: white;
+            border: 1px solid #50c878;
+        }
+        .pagination .info {
+            font-size: 12px;
+            color: #888;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+        }
+        
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
@@ -273,8 +327,8 @@ $penyaluran_kategori = $penyaluran_kategori && $penyaluran_kategori['pengeluaran
             <div class="menu-item" onclick="location.href='donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
             <div class="menu-item" onclick="location.href='../semua_program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
             <div class="menu-item" onclick="location.href='histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
-            <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Laporan Pengeluaran</span></div>
-            <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
+            <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+            <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khususon Do'a</span></div>
             <div class="menu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
             <div class="menu-item active" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
         </div>
@@ -361,6 +415,9 @@ $penyaluran_kategori = $penyaluran_kategori && $penyaluran_kategori['pengeluaran
                     <span class="badge-tipe-operasional">💸 Operasional</span>
                     <span class="badge-tipe-penyaluran">🤝 Penyaluran</span>
                 </span>
+                <span style="font-size:12px;color:#888;font-weight:400;margin-left:auto;">
+                    Total: <?php echo $total_rincian; ?> data
+                </span>
             </div>
             <div class="table-wrapper">
                 <table>
@@ -418,6 +475,29 @@ $penyaluran_kategori = $penyaluran_kategori && $penyaluran_kategori['pengeluaran
                     </tbody>
                 </table>
             </div>
+            
+            <!-- PAGINATION RINCIAN TRANSAKSI -->
+            <?php if ($total_pages_rincian > 1): ?>
+            <div class="pagination">
+                <?php if ($page_rincian > 1): ?>
+                    <a href="?page_rincian=<?php echo $page_rincian-1; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">« Sebelumnya</a>
+                <?php endif; ?>
+                
+                <?php for ($i = 1; $i <= $total_pages_rincian; $i++): ?>
+                    <?php if ($i == $page_rincian): ?>
+                        <span class="active"><?php echo $i; ?></span>
+                    <?php else: ?>
+                        <a href="?page_rincian=<?php echo $i; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>"><?php echo $i; ?></a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+                
+                <?php if ($page_rincian < $total_pages_rincian): ?>
+                    <a href="?page_rincian=<?php echo $page_rincian+1; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">Selanjutnya »</a>
+                <?php endif; ?>
+                
+                <span class="info">Halaman <?php echo $page_rincian; ?> dari <?php echo $total_pages_rincian; ?></span>
+            </div>
+            <?php endif; ?>
         </div>
         
         <!-- RINCIAN PER KATEGORI -->

@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: admin/verifikasi_program.php
 // HALAMAN VERIFIKASI DONASI PROGRAM (CROWDFUNDING)
+// DENGAN CATATAN VERIFIKASI (OPSIONAL)
 // ======================================================
 
 require_once '../config/database.php';
@@ -19,6 +20,7 @@ $currentUser = getCurrentUser();
 if (isset($_POST['verifikasi'])) {
     $id = (int)$_POST['id'];
     $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $catatan_verifikasi = mysqli_real_escape_string($conn, $_POST['catatan_verifikasi'] ?? '');
     $verified_by = $currentUser['id'];
     $verified_at = date('Y-m-d H:i:s');
     
@@ -26,26 +28,41 @@ if (isset($_POST['verifikasi'])) {
     $donasi = mysqli_fetch_assoc($query);
     $program_id = $donasi['program_id'];
     
-    $sql = "UPDATE donasi_program SET status = '$status', verified_by = $verified_by, verified_at = '$verified_at' WHERE id = $id";
+    $sql = "UPDATE donasi_program SET 
+            status = '$status', 
+            verified_by = $verified_by, 
+            verified_at = '$verified_at',
+            catatan_verifikasi = '$catatan_verifikasi' 
+            WHERE id = $id";
     
     if (mysqli_query($conn, $sql)) {
+        // Update program donasi
         $update_program = "UPDATE program_donasi SET 
                    jumlah_donatur = (SELECT COUNT(*) FROM donasi_program WHERE program_id = $program_id AND status = 'success'),
                    terkumpul = (SELECT SUM(nominal) FROM donasi_program WHERE program_id = $program_id AND status = 'success')
                    WHERE id = $program_id";
+        mysqli_query($conn, $update_program);
+        
         logActivity($currentUser['id'], "Verifikasi donasi program ID: $id => $status");
         $_SESSION['success'] = "Donasi program berhasil diverifikasi!";
     } else {
         $_SESSION['error'] = "Gagal verifikasi: " . mysqli_error($conn);
     }
-    header("Location: verifikasi_program.php");
+    
+    // Redirect ke halaman yang sama
+    $page = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+    $redirect_url = "verifikasi_program.php?page=$page";
+    header("Location: $redirect_url");
     exit();
 }
 
-// Update verifikasi (edit)
+// ======================================================
+// PROSES UPDATE VERIFIKASI (EDIT)
+// ======================================================
 if (isset($_POST['update_verifikasi'])) {
     $id = (int)$_POST['id'];
     $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $catatan_verifikasi = mysqli_real_escape_string($conn, $_POST['catatan_verifikasi'] ?? '');
     $verified_by = $currentUser['id'];
     $verified_at = date('Y-m-d H:i:s');
     
@@ -53,7 +70,12 @@ if (isset($_POST['update_verifikasi'])) {
     $donasi = mysqli_fetch_assoc($query);
     $program_id = $donasi['program_id'];
     
-    $sql = "UPDATE donasi_program SET status = '$status', verified_by = $verified_by, verified_at = '$verified_at' WHERE id = $id";
+    $sql = "UPDATE donasi_program SET 
+            status = '$status', 
+            verified_by = $verified_by, 
+            verified_at = '$verified_at',
+            catatan_verifikasi = '$catatan_verifikasi' 
+            WHERE id = $id";
     
     if (mysqli_query($conn, $sql)) {
         $update_program = "UPDATE program_donasi SET 
@@ -67,23 +89,47 @@ if (isset($_POST['update_verifikasi'])) {
     } else {
         $_SESSION['error'] = "Gagal mengupdate verifikasi: " . mysqli_error($conn);
     }
-    header("Location: verifikasi_program.php");
+    
+    // Redirect ke halaman yang sama
+    $page = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+    $redirect_url = "verifikasi_program.php?page=$page";
+    header("Location: $redirect_url");
     exit();
 }
+
+// ======================================================
 // HAPUS DONASI PROGRAM
+// ======================================================
 if (isset($_GET['hapus'])) {
     $id = (int)$_GET['hapus'];
     
+    // Ambil program_id untuk update
+    $query = mysqli_query($conn, "SELECT program_id FROM donasi_program WHERE id = $id");
+    $donasi = mysqli_fetch_assoc($query);
+    $program_id = $donasi['program_id'];
+    
     $sql = "DELETE FROM donasi_program WHERE id = $id";
     if (mysqli_query($conn, $sql)) {
+        // Update program donasi
+        $update_program = "UPDATE program_donasi SET 
+                           jumlah_donatur = (SELECT COUNT(*) FROM donasi_program WHERE program_id = $program_id AND status = 'success'),
+                           terkumpul = (SELECT SUM(nominal) FROM donasi_program WHERE program_id = $program_id AND status = 'success')
+                           WHERE id = $program_id";
+        mysqli_query($conn, $update_program);
+        
         logActivity($currentUser['id'], "Menghapus donasi program ID: $id");
         $_SESSION['success'] = "Donasi program berhasil dihapus!";
     } else {
         $_SESSION['error'] = "Gagal menghapus: " . mysqli_error($conn);
     }
-    header("Location: verifikasi_program.php");
+    
+    // Redirect ke halaman yang sama
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $redirect_url = "verifikasi_program.php?page=$page";
+    header("Location: $redirect_url");
     exit();
 }
+
 // ======================================================
 // FILTER & PAGINATION
 // ======================================================
@@ -117,7 +163,7 @@ $sql = "SELECT dp.*, p.nama_program, u.nama_lengkap as verified_by_nama
         JOIN program_donasi p ON dp.program_id = p.id 
         LEFT JOIN users u ON dp.verified_by = u.id 
         $where 
-        ORDER BY dp.created_at ASC
+        ORDER BY dp.created_at DESC
         LIMIT $offset, $limit";
 $donasiList = query($sql);
 
@@ -140,7 +186,6 @@ unset($_SESSION['success'], $_SESSION['error']);
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
         
-        /* SIDEBAR */
         .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; z-index: 100; }
         .sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; justify-content: center; }
         .sidebar-logo { width: 45px; height: 45px; object-fit: contain; }
@@ -157,11 +202,16 @@ unset($_SESSION['success'], $_SESSION['error']);
         .submenu-item:hover { color: #50c878; padding-left: 25px; }
         .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
         .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
-        
-        /* MAIN CONTENT */
+        .badge-pending {
+    background: #f44336;
+    color: white;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    margin-left: auto;
+        }
+
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
-        
-        /* TOPBAR */
         .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
         .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
@@ -172,7 +222,6 @@ unset($_SESSION['success'], $_SESSION['error']);
         .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
         .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
         
-        /* CONTENT */
         .content-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; }
@@ -181,7 +230,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
         .btn-filter { background: #50c878; color: white; }
         .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
-        .btn-delete { background: #dc3545; color: white; }
+        
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
         td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
@@ -193,6 +242,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-detail { background: #17a2b8; color: white; }
         .btn-verifikasi { background: #ffc107; color: #333; }
         .btn-edit-verifikasi { background: #2196f3; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
         
         .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
         .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
@@ -205,22 +255,27 @@ unset($_SESSION['success'], $_SESSION['error']);
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 20px; width: 550px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; border-radius: 20px; width: 600px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .close-modal { font-size: 24px; cursor: pointer; }
         .detail-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .detail-label { font-weight: 600; font-size: 12px; color: #888; margin-bottom: 5px; }
         .detail-value { font-size: 14px; color: #333; }
-        .radio-group { display: flex; gap: 20px; align-items: center; margin: 10px 0; }
+        .radio-group { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .radio-group label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-save { background: #50c878; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
         .btn-cancel { background: #6c757d; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; }
+        .form-group textarea { width: 100%; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; resize: vertical; min-height: 80px; }
+        .form-group textarea:focus { outline: none; border-color: #50c878; }
+        .catatan-info { font-size: 12px; color: #888; margin-top: 5px; }
         
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">
             <img src="../assets/image/almuthi.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
@@ -233,10 +288,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="submenu open">
                 <div class="submenu-item" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
                 <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-                    <div class="submenu-item" onclick="location.href='verifikasi_program.php'">
-    <i class="fas fa-heart"></i>
-    <span>Verifikasi Program</span>
-</div>
+                <div class="submenu-item active" onclick="location.href='verifikasi_program.php'"><i class="fas fa-heart"></i><span>Verifikasi Program</span></div>
                 <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
             </div>
             <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
@@ -249,10 +301,19 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="submenu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
                 <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
             </div>
+             <div class="menu-item" onclick="location.href='verifikasi_pendaftaran.php'">
+    <i class="fas fa-user-check"></i>
+    <span>Verifikasi Akun</span>
+    <?php 
+    $pending_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM pendaftaran WHERE status = 'pending'"))['total'];
+    if ($pending_count > 0): 
+    ?>
+        <span class="badge-pending"><?php echo $pending_count; ?></span>
+    <?php endif; ?>
+</div>
         </div>
     </div>
     
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="topbar">
             <div class="page-title">
@@ -332,24 +393,22 @@ unset($_SESSION['success'], $_SESSION['error']);
                                 <?php else: ?>
                                     <?php echo htmlspecialchars($d['nama_donatur']); ?>
                                 <?php endif; ?>
-                                </td>
+                            </td>
                             <td>Rp <?php echo number_format($d['nominal'], 0, ',', '.'); ?></td>
                             <td><?php echo htmlspecialchars(substr($d['pesan'], 0, 30)) . (strlen($d['pesan']) > 30 ? '...' : ''); ?></td>
                             <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
                             <td>
                                 <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $d['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
                                 <?php if ($d['status'] == 'pending'): ?>
-                                    <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $d['id']; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
+                                    <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $d['id']; ?>, <?php echo $page; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
                                 <?php else: ?>
-                                    <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $d['id']; ?>)"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $d['id']; ?>, <?php echo $page; ?>)"><i class="fas fa-edit"></i> Edit</button>
                                 <?php endif; ?>
-                                <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $d['id']; ?>)"><i class="fas fa-trash"></i> Hapus</button>
-    <!-- SAMPAI SINI -->
-</td>
-                                </td>
-                                </td>
+                                <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $d['id']; ?>, <?php echo $page; ?>)"><i class="fas fa-trash"></i> Hapus</button>
+                            </td>
+                        </tr>
                         <?php endforeach; else: ?>
-                        <td><td colspan="7" style="text-align:center; padding:40px;">Tidak ada donasi program</td></tr>
+                        <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada donasi program</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -357,11 +416,19 @@ unset($_SESSION['success'], $_SESSION['error']);
             
             <?php if ($total_pages > 1): ?>
             <div class="pagination">
-                <?php if ($page > 1): ?><a href="?page=<?php echo $page-1; ?>">«</a><?php endif; ?>
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?php echo $page-1; ?>&search=<?php echo $search; ?>&program=<?php echo $filter_program; ?>&status=<?php echo $filter_status; ?>">« Sebelumnya</a>
+                <?php endif; ?>
                 <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                    <?php if ($i == $page): ?><span class="active"><?php echo $i; ?></span><?php else: ?><a href="?page=<?php echo $i; ?>"><?php echo $i; ?></a><?php endif; ?>
+                    <?php if ($i == $page): ?>
+                        <span class="active"><?php echo $i; ?></span>
+                    <?php else: ?>
+                        <a href="?page=<?php echo $i; ?>&search=<?php echo $search; ?>&program=<?php echo $filter_program; ?>&status=<?php echo $filter_status; ?>"><?php echo $i; ?></a>
+                    <?php endif; ?>
                 <?php endfor; ?>
-                <?php if ($page < $total_pages): ?><a href="?page=<?php echo $page+1; ?>">»</a><?php endif; ?>
+                <?php if ($page < $total_pages): ?>
+                    <a href="?page=<?php echo $page+1; ?>&search=<?php echo $search; ?>&program=<?php echo $filter_program; ?>&status=<?php echo $filter_status; ?>">Selanjutnya »</a>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
@@ -382,13 +449,19 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="modal-header"><h3>Verifikasi Donasi Program</h3><span class="close-modal" onclick="closeModal('verifikasiModal')">&times;</span></div>
             <form method="POST">
                 <input type="hidden" name="id" id="verifikasi_id">
+                <input type="hidden" name="page" id="verifikasi_page">
                 <div id="verifikasiData"></div>
                 <div class="form-group">
-                    <label>Status</label>
+                    <label>Status Verifikasi</label>
                     <div class="radio-group">
-                        <label><input type="radio" name="status" value="success"> ✅ Sukses</label>
+                        <label><input type="radio" name="status" value="success" required> ✅ Sukses</label>
                         <label><input type="radio" name="status" value="failed"> ❌ Gagal</label>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Catatan Verifikasi (Opsional)</label>
+                    <textarea name="catatan_verifikasi" placeholder="Isi catatan jika ada hal yang perlu disampaikan ke donatur (contoh: bukti transfer tidak jelas, nominal tidak sesuai, dll)" rows="3"></textarea>
+                    <small class="catatan-info"><i class="fas fa-info-circle"></i> Catatan akan ditampilkan ke donatur di histori donasi. Kosongkan jika tidak perlu.</small>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel" onclick="closeModal('verifikasiModal')">Batal</button>
@@ -403,14 +476,20 @@ unset($_SESSION['success'], $_SESSION['error']);
         <div class="modal-content">
             <div class="modal-header"><h3>Edit Verifikasi Donasi Program</h3><span class="close-modal" onclick="closeModal('editVerifikasiModal')">&times;</span></div>
             <form method="POST">
-                <input type="hidden" name="id" id="edit_id">
+                <input type="hidden" name="id" id="edit_verifikasi_id">
+                <input type="hidden" name="page" id="edit_verifikasi_page">
                 <div id="editVerifikasiData"></div>
                 <div class="form-group">
-                    <label>Ubah Status</label>
+                    <label>Ubah Status Verifikasi</label>
                     <div class="radio-group">
-                        <label><input type="radio" name="status" value="success"> ✅ Sukses</label>
-                        <label><input type="radio" name="status" value="failed"> ❌ Gagal</label>
+                        <label><input type="radio" name="status" value="success" id="edit_status_success"> ✅ Sukses</label>
+                        <label><input type="radio" name="status" value="failed" id="edit_status_failed"> ❌ Gagal</label>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Catatan Verifikasi (Opsional)</label>
+                    <textarea name="catatan_verifikasi" id="edit_catatan_verifikasi" placeholder="Isi catatan jika ada hal yang perlu disampaikan ke donatur" rows="3"></textarea>
+                    <small class="catatan-info"><i class="fas fa-info-circle"></i> Catatan akan ditampilkan ke donatur di histori donasi</small>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel" onclick="closeModal('editVerifikasiModal')">Batal</button>
@@ -428,42 +507,75 @@ unset($_SESSION['success'], $_SESSION['error']);
             fetch('get_donasi_program.php?id='+id).then(r=>r.json()).then(d=>{
                 if(d.success){
                     let statusText = d.data.status == 'pending' ? 'Pending' : (d.data.status == 'success' ? 'Sukses' : 'Gagal');
+                    let statusClass = d.data.status == 'pending' ? 'status-pending' : (d.data.status == 'success' ? 'status-success' : 'status-failed');
+                    let catatanHtml = d.data.catatan_verifikasi ? `<div class="detail-item"><div class="detail-label">Catatan Verifikasi</div><div class="detail-value">${d.data.catatan_verifikasi}</div></div>` : '';
+                    
                     document.getElementById('detailContent').innerHTML = `
                         <div class="detail-item"><div class="detail-label">ID</div><div class="detail-value">${d.data.id}</div></div>
                         <div class="detail-item"><div class="detail-label">Program</div><div class="detail-value">${d.data.nama_program}</div></div>
                         <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.data.is_anonim ? '🙈 Anonim' : d.data.nama_donatur}</div></div>
                         <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.data.nominal)}</div></div>
                         <div class="detail-item"><div class="detail-label">Pesan</div><div class="detail-value">${d.data.pesan || '-'}</div></div>
-                        <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${statusText}</div></div>
+                        <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>
+                        ${catatanHtml}
                         ${d.data.bukti_transfer ? `<div class="detail-item"><div class="detail-label">Bukti Transfer</div><div class="detail-value"><a href="../assets/uploads/bukti_transfer/${d.data.bukti_transfer}" target="_blank">Lihat Bukti</a></div></div>` : ''}
+                        ${d.data.verified_at ? `<div class="detail-item"><div class="detail-label">Diverifikasi Pada</div><div class="detail-value">${d.data.verified_at}</div></div>` : ''}
+                        ${d.data.verified_by_nama ? `<div class="detail-item"><div class="detail-label">Diverifikasi Oleh</div><div class="detail-value">${d.data.verified_by_nama}</div></div>` : ''}
                     `;
                     document.getElementById('detailModal').classList.add('show');
                 }
             });
         }
         
-        function openVerifikasiModal(id){
+        function openVerifikasiModal(id, page){
             fetch('get_donasi_program.php?id='+id).then(r=>r.json()).then(d=>{
                 if(d.success){
                     document.getElementById('verifikasi_id').value = d.data.id;
-                    document.getElementById('verifikasiData').innerHTML = `<div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.data.is_anonim ? 'Anonim' : d.data.nama_donatur}</div></div><div class="detail-item"><div class="detail-label">Program</div><div class="detail-value">${d.data.nama_program}</div></div><div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.data.nominal)}</div></div>`;
+                    document.getElementById('verifikasi_page').value = page;
+                    document.getElementById('verifikasiData').innerHTML = `
+                        <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.data.is_anonim ? 'Anonim' : d.data.nama_donatur}</div></div>
+                        <div class="detail-item"><div class="detail-label">Program</div><div class="detail-value">${d.data.nama_program}</div></div>
+                        <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.data.nominal)}</div></div>
+                        ${d.data.bukti_transfer ? `<div class="detail-item"><div class="detail-label">Bukti Transfer</div><div class="detail-value"><a href="../assets/uploads/bukti_transfer/${d.data.bukti_transfer}" target="_blank">Lihat Bukti</a></div></div>` : ''}
+                    `;
                     document.getElementById('verifikasiModal').classList.add('show');
                 }
             });
         }
-        function confirmDelete(id) {
-    if (confirm('Yakin ingin menghapus donasi program ini? Data yang dihapus tidak dapat dikembalikan.')) {
-        window.location.href = 'verifikasi_program.php?hapus=' + id;
-    }
-}
-        function openEditVerifikasiModal(id){
+        
+        function openEditVerifikasiModal(id, page){
             fetch('get_donasi_program.php?id='+id).then(r=>r.json()).then(d=>{
                 if(d.success){
-                    document.getElementById('edit_id').value = d.data.id;
-                    document.getElementById('editVerifikasiData').innerHTML = `<div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.data.is_anonim ? 'Anonim' : d.data.nama_donatur}</div></div><div class="detail-item"><div class="detail-label">Program</div><div class="detail-value">${d.data.nama_program}</div></div><div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.data.nominal)}</div></div><div class="detail-item"><div class="detail-label">Status Saat Ini</div><div class="detail-value">${d.data.status == 'pending' ? 'Pending' : (d.data.status == 'success' ? 'Sukses' : 'Gagal')}</div></div>`;
+                    document.getElementById('edit_verifikasi_id').value = d.data.id;
+                    document.getElementById('edit_verifikasi_page').value = page;
+                    
+                    // Set radio button sesuai status saat ini
+                    if (d.data.status == 'success') {
+                        document.getElementById('edit_status_success').checked = true;
+                    } else if (d.data.status == 'failed') {
+                        document.getElementById('edit_status_failed').checked = true;
+                    }
+                    
+                    document.getElementById('editVerifikasiData').innerHTML = `
+                        <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.data.is_anonim ? 'Anonim' : d.data.nama_donatur}</div></div>
+                        <div class="detail-item"><div class="detail-label">Program</div><div class="detail-value">${d.data.nama_program}</div></div>
+                        <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.data.nominal)}</div></div>
+                        <div class="detail-item"><div class="detail-label">Status Saat Ini</div><div class="detail-value"><span class="status-badge ${d.data.status == 'success' ? 'status-success' : 'status-failed'}">${d.data.status == 'success' ? 'Sukses' : 'Gagal'}</span></div></div>
+                        ${d.data.catatan_verifikasi ? `<div class="detail-item"><div class="detail-label">Catatan Sebelumnya</div><div class="detail-value">${d.data.catatan_verifikasi}</div></div>` : ''}
+                    `;
+                    
+                    // Set catatan
+                    document.getElementById('edit_catatan_verifikasi').value = d.data.catatan_verifikasi || '';
+                    
                     document.getElementById('editVerifikasiModal').classList.add('show');
                 }
             });
+        }
+        
+        function confirmDelete(id, page){
+            if(confirm('Yakin ingin menghapus donasi program ini? Data yang dihapus tidak dapat dikembalikan.')){
+                window.location.href = 'verifikasi_program.php?hapus=' + id + '&page=' + page;
+            }
         }
         
         window.onclick = function(event){if(event.target.classList.contains('modal')) event.target.classList.remove('show');}

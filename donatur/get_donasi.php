@@ -1,27 +1,34 @@
 <?php
+// ======================================================
+// FILE: donatur/get_donasi.php
+// API GET DATA DONASI UNTUK DONATUR
+// ======================================================
+
 require_once '../config/database.php';
 require_once '../config/session.php';
+require_once '../config/rbac.php';
 
-header('Content-Type: application/json');
+requireRole('donatur');
 
-if (!isset($_GET['id'])) {
-    echo json_encode(['success' => false]);
-    exit();
-}
+$currentUser = getCurrentUser();
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-$id = (int)$_GET['id'];
-$user_id = $_SESSION['user_id'];
-
-$sql = "SELECT d.*, k.nama_kategori 
-        FROM donasi d 
-        JOIN kategori_donasi k ON d.kategori_id = k.id 
-        WHERE d.id = $id AND d.user_id = $user_id";
-
-$result = mysqli_query($conn, $sql);
-
-if ($data = mysqli_fetch_assoc($result)) {
-    echo json_encode(['success' => true, 'data' => $data]);
+if ($id > 0) {
+    // Cek kepemilikan donasi
+    $sql = "SELECT d.*, k.nama_kategori 
+            FROM donasi d 
+            JOIN kategori_donasi k ON d.kategori_id = k.id 
+            WHERE d.id = $id AND d.user_id = " . $currentUser['id'];
+    
+    $result = mysqli_query($conn, $sql);
+    $data = mysqli_fetch_assoc($result);
+    
+    if ($data) {
+        echo json_encode(['success' => true, 'data' => $data]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Donasi tidak ditemukan']);
+    }
 } else {
-    echo json_encode(['success' => false]);
+    echo json_encode(['success' => false, 'message' => 'ID tidak valid']);
 }
 ?>

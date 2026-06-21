@@ -365,9 +365,9 @@ unset($_SESSION['success'], $_SESSION['error']);
                                     <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-info-circle"></i> Detail</button>
                                     <?php if ($canEditDelete): ?>
     <?php if ($r['tipe'] == 'biasa'): ?>
-        <button class="btn-action btn-edit" onclick="location.href='../edit_donasi.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
+        <button class="btn-action btn-edit" onclick="location.href='edit_donasi.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
     <?php elseif ($r['tipe'] == 'program'): ?>
-        <button class="btn-action btn-edit" onclick="location.href='../edit_donasi_program.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
+        <button class="btn-action btn-edit" onclick="location.href='edit_donasi_program.php?id=<?php echo $r['id']; ?>'"><i class="fas fa-edit"></i> Edit</button>
     <?php endif; ?>
     <button class="btn-action btn-delete" onclick="confirmDelete(<?php echo $r['id']; ?>, '<?php echo $r['tipe']; ?>')"><i class="fas fa-trash"></i> Hapus</button>
 <?php endif; ?>
@@ -427,42 +427,49 @@ unset($_SESSION['success'], $_SESSION['error']);
         }
         
         function openDetailModal(id, tipe) {
-            let url = (tipe == 'biasa') ? 'get_donasi.php?id=' + id : 'get_donasi_program.php?id=' + id;
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        let d = data.data;
-                        let statusText = d.status == 'pending' ? 'Menunggu' : (d.status == 'success' ? 'Sukses' : 'Tidak Valid');
-                        let statusClass = d.status == 'pending' ? 'status-pending' : (d.status == 'success' ? 'status-success' : 'status-failed');
-                        let imageHtml = d.bukti_transfer ? `<div class="detail-image"><img src="../assets/uploads/bukti_transfer/${d.bukti_transfer}" onclick="window.open(this.src)"></div>` : '<div class="detail-image"><p>Tidak ada bukti transfer</p></div>';
-                        
-                        let detailHtml = `
-                            <div class="detail-item"><div class="detail-label">ID Donasi</div><div class="detail-value">${d.id}</div></div>
-                            <div class="detail-item"><div class="detail-label">Tanggal Donasi</div><div class="detail-value">${d.tanggal_donasi || d.created_at}</div></div>
-                            <div class="detail-item"><div class="detail-label">Kategori/Program</div><div class="detail-value">${d.nama_kategori || d.nama_program}</div></div>
-                            <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.nominal)}</div></div>
-                            <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${d.keterangan || d.pesan || '-'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>
-                            ${imageHtml}
-                        `;
-                        
-                        if (tipe == 'biasa' && d.catatan_doa) {
-                            detailHtml += `<div class="detail-item"><div class="detail-label">Catatan Doa</div><div class="detail-value">${d.catatan_doa}</div></div>`;
-                        }
-                        
-                        document.getElementById('detailContent').innerHTML = detailHtml;
-                        document.getElementById('detailModal').classList.add('show');
-                    } else {
-                        alert('Gagal mengambil data donasi');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Terjadi kesalahan');
-                });
-        }
+    let url = (tipe == 'biasa') ? 'get_donasi.php?id=' + id : 'get_donasi_program.php?id=' + id;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let d = data.data;
+                let statusText = d.status == 'pending' ? 'Menunggu' : (d.status == 'success' ? 'Sukses' : 'Tidak Valid');
+                let statusClass = d.status == 'pending' ? 'status-pending' : (d.status == 'success' ? 'status-success' : 'status-failed');
+                let imageHtml = d.bukti_transfer ? `<div class="detail-image"><img src="../assets/uploads/bukti_transfer/${d.bukti_transfer}" onclick="window.open(this.src)"></div>` : '<div class="detail-image"><p>Tidak ada bukti transfer</p></div>';
+                
+                // Tambahkan catatan verifikasi
+                let catatanHtml = '';
+                if (d.catatan_verifikasi && d.status == 'failed') {
+                    catatanHtml = `<div class="detail-item"><div class="detail-label">Catatan Verifikasi</div><div class="detail-value" style="color:#d32f2f; background:#ffebee; padding:8px; border-radius:8px;">${d.catatan_verifikasi}</div></div>`;
+                }
+                
+                let detailHtml = `
+                    <div class="detail-item"><div class="detail-label">ID Donasi</div><div class="detail-value">${d.id}</div></div>
+                    <div class="detail-item"><div class="detail-label">Tanggal Donasi</div><div class="detail-value">${d.tanggal_donasi || d.created_at}</div></div>
+                    <div class="detail-item"><div class="detail-label">Kategori/Program</div><div class="detail-value">${d.nama_kategori || d.nama_program}</div></div>
+                    <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.nominal)}</div></div>
+                    <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${d.keterangan || d.pesan || '-'}</div></div>
+                    <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>
+                    ${catatanHtml}
+                    ${imageHtml}
+                `;
+                
+                if (tipe == 'biasa' && d.catatan_doa) {
+                    detailHtml += `<div class="detail-item"><div class="detail-label">Catatan Doa</div><div class="detail-value">${d.catatan_doa}</div></div>`;
+                }
+                
+                document.getElementById('detailContent').innerHTML = detailHtml;
+                document.getElementById('detailModal').classList.add('show');
+            } else {
+                alert('Gagal mengambil data donasi');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan');
+        });
+}
         
         function confirmDelete(id, tipe) {
             if (confirm('Apakah Anda yakin ingin menghapus donasi ini? Data yang dihapus tidak dapat dikembalikan.')) {

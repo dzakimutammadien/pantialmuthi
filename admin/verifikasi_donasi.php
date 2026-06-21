@@ -2,7 +2,7 @@
 // ======================================================
 // FILE: admin/verifikasi_donasi.php
 // HALAMAN VERIFIKASI DONASI UNTUK ADMIN
-// DENGAN FITUR EDIT VERIFIKASI
+// DENGAN CATATAN PENOLAKAN (TIDAK WAJIB)
 // ======================================================
 
 require_once '../config/database.php';
@@ -20,10 +20,19 @@ $currentUser = getCurrentUser();
 if (isset($_POST['verifikasi'])) {
     $id = (int)$_POST['id'];
     $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $catatan_verifikasi = mysqli_real_escape_string($conn, $_POST['catatan_verifikasi'] ?? '');
     $verified_by = $currentUser['id'];
     $verified_at = date('Y-m-d H:i:s');
     
-    $sql = "UPDATE donasi SET status = '$status', verified_by = $verified_by, verified_at = '$verified_at' WHERE id = $id";
+    // Jika status success, catatan tetap bisa diisi tapi opsional
+    // Jika status failed, catatan bisa diisi opsional
+    
+    $sql = "UPDATE donasi SET 
+            status = '$status', 
+            verified_by = $verified_by, 
+            verified_at = '$verified_at',
+            catatan_verifikasi = '$catatan_verifikasi' 
+            WHERE id = $id";
     
     if (mysqli_query($conn, $sql)) {
         logActivity($currentUser['id'], "Verifikasi donasi ID: $id => $status");
@@ -31,7 +40,11 @@ if (isset($_POST['verifikasi'])) {
     } else {
         $_SESSION['error'] = "Gagal verifikasi: " . mysqli_error($conn);
     }
-    header("Location: verifikasi_donasi.php");
+    
+    // Redirect ke halaman yang sama
+    $page = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+    $redirect_url = "verifikasi_donasi.php?page=$page";
+    header("Location: $redirect_url");
     exit();
 }
 
@@ -41,10 +54,16 @@ if (isset($_POST['verifikasi'])) {
 if (isset($_POST['update_verifikasi'])) {
     $id = (int)$_POST['id'];
     $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $catatan_verifikasi = mysqli_real_escape_string($conn, $_POST['catatan_verifikasi'] ?? '');
     $verified_by = $currentUser['id'];
     $verified_at = date('Y-m-d H:i:s');
     
-    $sql = "UPDATE donasi SET status = '$status', verified_by = $verified_by, verified_at = '$verified_at' WHERE id = $id";
+    $sql = "UPDATE donasi SET 
+            status = '$status', 
+            verified_by = $verified_by, 
+            verified_at = '$verified_at',
+            catatan_verifikasi = '$catatan_verifikasi' 
+            WHERE id = $id";
     
     if (mysqli_query($conn, $sql)) {
         logActivity($currentUser['id'], "Mengupdate verifikasi donasi ID: $id => $status");
@@ -52,7 +71,11 @@ if (isset($_POST['update_verifikasi'])) {
     } else {
         $_SESSION['error'] = "Gagal mengupdate verifikasi: " . mysqli_error($conn);
     }
-    header("Location: verifikasi_donasi.php");
+    
+    // Redirect ke halaman yang sama
+    $page = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+    $redirect_url = "verifikasi_donasi.php?page=$page";
+    header("Location: $redirect_url");
     exit();
 }
 
@@ -108,7 +131,7 @@ $sql = "SELECT d.*, u.nama_lengkap, u.username, k.nama_kategori,
         JOIN kategori_donasi k ON d.kategori_id = k.id 
         LEFT JOIN users v ON d.verified_by = v.id 
         $where 
-        ORDER BY d.tanggal_donasi ASC 
+        ORDER BY d.tanggal_donasi DESC 
         LIMIT $offset, $limit";
 $donasiList = query($sql);
 
@@ -132,7 +155,6 @@ unset($_SESSION['success'], $_SESSION['error']);
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #f0f2f5; overflow-x: hidden; }
         
-        /* SIDEBAR */
         .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100%; background: linear-gradient(135deg, #1a3a2a 0%, #2d4a3a 100%); color: white; overflow-y: auto; z-index: 100; }
         .sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; justify-content: center; }
         .sidebar-logo { width: 45px; height: 45px; object-fit: contain; }
@@ -149,11 +171,15 @@ unset($_SESSION['success'], $_SESSION['error']);
         .submenu-item:hover { color: #50c878; padding-left: 25px; }
         .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
         .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
-        
-        /* MAIN CONTENT */
+        .badge-pending {
+    background: #f44336;
+    color: white;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    margin-left: auto;
+        }
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
-        
-        /* TOPBAR */
         .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .page-title h2 { font-size: 20px; color: #333; }
         .page-title p { font-size: 13px; color: #888; margin-top: 5px; }
@@ -164,7 +190,6 @@ unset($_SESSION['success'], $_SESSION['error']);
         .dropdown-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
         .dropdown-menu a:hover { background: #f5f5f5; color: #50c878; }
         
-        /* CONTENT */
         .content-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .filter-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .filter-section input, .filter-section select { padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; }
@@ -173,8 +198,10 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-filter, .btn-reset { padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; }
         .btn-filter { background: #50c878; color: white; }
         .btn-reset { background: #6c757d; color: white; text-decoration: none; display: inline-block; }
+        .alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 20px; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
+        .alert-error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
         
-        /* TABLE */
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; background: #f8f9fa; font-size: 13px; }
         td { padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: middle; }
@@ -188,16 +215,14 @@ unset($_SESSION['success'], $_SESSION['error']);
         .btn-edit-verifikasi { background: #2196f3; color: white; }
         .btn-edit-verifikasi:hover { background: #0b7dda; }
         
-        /* PAGINATION */
         .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
         .pagination a, .pagination span { padding: 8px 14px; border-radius: 8px; text-decoration: none; }
         .pagination a { background: #f0f2f5; color: #555; }
         .pagination .active { background: #50c878; color: white; }
         
-        /* MODAL */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 20px; width: 550px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; border-radius: 20px; width: 600px; max-width: 90%; padding: 25px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .close-modal { font-size: 24px; cursor: pointer; }
         .detail-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
@@ -205,17 +230,21 @@ unset($_SESSION['success'], $_SESSION['error']);
         .detail-value { font-size: 14px; color: #333; }
         .detail-image { text-align: center; margin: 15px 0; }
         .detail-image img { max-width: 100%; max-height: 300px; border-radius: 10px; cursor: pointer; }
-        .radio-group { display: flex; gap: 20px; align-items: center; }
+        .radio-group { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
         .radio-group label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-save { background: #50c878; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
         .btn-cancel { background: #6c757d; color: white; padding: 10px 25px; border: none; border-radius: 10px; cursor: pointer; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; }
+        .form-group textarea { width: 100%; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; resize: vertical; min-height: 80px; }
+        .form-group textarea:focus { outline: none; border-color: #50c878; }
+        .catatan-info { font-size: 12px; color: #888; margin-top: 5px; }
         
         @media (max-width: 768px) { .sidebar { left: -280px; } .main-content { margin-left: 0; } }
     </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">
             <img src="../assets/image/almuthi.png" alt="Logo Al-Muthi" class="sidebar-logo" onerror="this.style.display='none'">
@@ -228,10 +257,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <div class="submenu open">
                 <div class="submenu-item active" onclick="location.href='verifikasi_donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Donatur</span></div>
                 <div class="submenu-item" onclick="location.href='verifikasi_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
-                    <div class="submenu-item" onclick="location.href='verifikasi_program.php'">
-    <i class="fas fa-heart"></i>
-    <span>Verifikasi Program</span>
-</div>
+                <div class="submenu-item" onclick="location.href='verifikasi_program.php'"><i class="fas fa-heart"></i><span>Verifikasi Program</span></div>
                 <div class="submenu-item" onclick="location.href='laporan_keuangan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
             </div>
             <div class="menu-item has-submenu" onclick="toggleSubmenu(this)"><i class="fas fa-database"></i><span>Master Data</span><i class="fas fa-chevron-down arrow"></i></div>
@@ -240,20 +266,23 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="submenu-item" onclick="location.href='kategori_role.php'"><i class="fas fa-user-tag"></i><span>Kategori Role</span></div>
                 <div class="submenu-item" onclick="location.href='anak_asuh.php'"><i class="fas fa-child"></i><span>Data Anak Asuh</span></div>
                 <div class="submenu-item active" onclick="location.href='program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
-                <div class="submenu-item active" onclick="location.href='galeri.php'">
-                    <i class="fas fa-images"></i>
-                    <span>Galeri</span>
-                </div>
-                <div class="submenu-item active" onclick="location.href='perkembangan.php'">
-                    <i class="fas fa-seedling"></i>
-                    <span>Perkembangan Anak</span>
-                </div>
+                <div class="submenu-item active" onclick="location.href='galeri.php'"><i class="fas fa-images"></i><span>Galeri</span></div>
+                <div class="submenu-item active" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
                 <div class="submenu-item" onclick="location.href='doa_khusus.php'"><i class="fas fa-pray"></i><span>Data Doa Khusus</span></div>
             </div>
+             <div class="menu-item" onclick="location.href='verifikasi_pendaftaran.php'">
+    <i class="fas fa-user-check"></i>
+    <span>Verifikasi Akun</span>
+    <?php 
+    $pending_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM pendaftaran WHERE status = 'pending'"))['total'];
+    if ($pending_count > 0): 
+    ?>
+        <span class="badge-pending"><?php echo $pending_count; ?></span>
+    <?php endif; ?>
+</div>
         </div>
     </div>
     
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="topbar">
             <div class="page-title">
@@ -278,7 +307,6 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <div class="alert alert-error"><?php echo $error; ?></div>
             <?php endif; ?>
             
-            <!-- FILTER -->
             <form method="GET" action="" class="filter-section">
                 <input type="text" name="search" placeholder="Cari donatur atau keterangan..." value="<?php echo htmlspecialchars($search); ?>">
                 <select name="periode">
@@ -303,7 +331,6 @@ unset($_SESSION['success'], $_SESSION['error']);
                 <a href="verifikasi_donasi.php" class="btn-reset"><i class="fas fa-sync-alt"></i> Reset</a>
             </form>
             
-            <!-- TABLE -->
             <div class="table-wrapper">
                 <table>
                     <thead>
@@ -344,21 +371,19 @@ unset($_SESSION['success'], $_SESSION['error']);
                                     <button class="btn-action btn-detail" onclick="openDetailModal(<?php echo $d['id']; ?>)"><i class="fas fa-info-circle"></i> Detail</button>
                                     
                                     <?php if ($d['status'] == 'pending'): ?>
-                                        <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $d['id']; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
+                                        <button class="btn-action btn-verifikasi" onclick="openVerifikasiModal(<?php echo $d['id']; ?>, <?php echo $page; ?>)"><i class="fas fa-check-double"></i> Verifikasi</button>
                                     <?php else: ?>
-                                        <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $d['id']; ?>, '<?php echo $d['status']; ?>')"><i class="fas fa-edit"></i> Edit Verifikasi</button>
+                                        <button class="btn-action btn-edit-verifikasi" onclick="openEditVerifikasiModal(<?php echo $d['id']; ?>, '<?php echo $d['status']; ?>', <?php echo $page; ?>)"><i class="fas fa-edit"></i> Edit Verifikasi</button>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; else: ?>
-                            <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada data donasi</td>
-                            </tr>
+                            <tr><td colspan="7" style="text-align:center; padding:40px;">Tidak ada data donasi</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
             
-            <!-- PAGINATION -->
             <?php if ($total_pages > 1): ?>
             <div class="pagination">
                 <?php if ($page > 1): ?>
@@ -393,7 +418,7 @@ unset($_SESSION['success'], $_SESSION['error']);
         </div>
     </div>
     
-    <!-- MODAL VERIFIKASI (Pertama kali) -->
+    <!-- MODAL VERIFIKASI -->
     <div id="verifikasiModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -402,6 +427,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             </div>
             <form method="POST" action="">
                 <input type="hidden" name="id" id="verifikasi_id">
+                <input type="hidden" name="page" id="verifikasi_page">
                 <div id="verifikasiData"></div>
                 <div class="form-group">
                     <label>Status Verifikasi</label>
@@ -409,6 +435,11 @@ unset($_SESSION['success'], $_SESSION['error']);
                         <label><input type="radio" name="status" value="success" required> ✅ Disetujui (Sukses)</label>
                         <label><input type="radio" name="status" value="failed"> ❌ Ditolak (Tidak Valid)</label>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Catatan Verifikasi (Opsional)</label>
+                    <textarea name="catatan_verifikasi" id="catatan_verifikasi" placeholder="Isi catatan jika ada hal yang perlu disampaikan ke donatur (contoh: bukti transfer tidak jelas, nominal tidak sesuai, dll)" rows="3"></textarea>
+                    <small class="catatan-info"><i class="fas fa-info-circle"></i> Catatan akan ditampilkan ke donatur di histori donasi. Kosongkan jika tidak perlu.</small>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel" onclick="closeModal('verifikasiModal')">Batal</button>
@@ -427,6 +458,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             </div>
             <form method="POST" action="">
                 <input type="hidden" name="id" id="edit_verifikasi_id">
+                <input type="hidden" name="page" id="edit_verifikasi_page">
                 <div id="editVerifikasiData"></div>
                 <div class="form-group">
                     <label>Ubah Status Verifikasi</label>
@@ -435,9 +467,14 @@ unset($_SESSION['success'], $_SESSION['error']);
                         <label><input type="radio" name="status" value="failed" id="edit_status_failed"> ❌ Ditolak (Tidak Valid)</label>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Catatan Verifikasi (Opsional)</label>
+                    <textarea name="catatan_verifikasi" id="edit_catatan_verifikasi" placeholder="Isi catatan jika ada hal yang perlu disampaikan ke donatur" rows="3"></textarea>
+                    <small class="catatan-info"><i class="fas fa-info-circle"></i> Catatan akan ditampilkan ke donatur di histori donasi</small>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel" onclick="closeModal('editVerifikasiModal')">Batal</button>
-                    <button type="submit" name="update_verifikasi" class="btn-save">Simpan Perubahan</button>
+                    <button type="submit" name="update_verifikasi" class="btn-save">Simpan</button>
                 </div>
             </form>
         </div>
@@ -465,6 +502,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                         let statusText = d.status == 'pending' ? 'Menunggu' : (d.status == 'success' ? 'Sukses' : 'Tidak Valid');
                         let statusClass = d.status == 'pending' ? 'status-pending' : (d.status == 'success' ? 'status-success' : 'status-failed');
                         let imageHtml = d.bukti_transfer ? `<div class="detail-image"><img src="../assets/uploads/bukti_transfer/${d.bukti_transfer}" onclick="window.open(this.src)"></div>` : '<div class="detail-image"><p>Tidak ada bukti transfer</p></div>';
+                        let catatanHtml = d.catatan_verifikasi ? `<div class="detail-item"><div class="detail-label">Catatan Verifikasi</div><div class="detail-value">${d.catatan_verifikasi}</div></div>` : '';
                         
                         document.getElementById('detailContent').innerHTML = `
                             <div class="detail-item"><div class="detail-label">ID Donasi</div><div class="detail-value">${d.id}</div></div>
@@ -475,6 +513,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <div class="detail-item"><div class="detail-label">Keterangan</div><div class="detail-value">${d.keterangan || '-'}</div></div>
                             <div class="detail-item"><div class="detail-label">Catatan Doa</div><div class="detail-value">${d.catatan_doa || '-'}</div></div>
                             <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>
+                            ${catatanHtml}
                             ${imageHtml}
                             ${d.verified_at ? `<div class="detail-item"><div class="detail-label">Diverifikasi Pada</div><div class="detail-value">${d.verified_at}</div></div>` : ''}
                             ${d.verified_by_nama ? `<div class="detail-item"><div class="detail-label">Diverifikasi Oleh</div><div class="detail-value">${d.verified_by_nama}</div></div>` : ''}
@@ -484,13 +523,14 @@ unset($_SESSION['success'], $_SESSION['error']);
                 });
         }
         
-        function openVerifikasiModal(id) {
+        function openVerifikasiModal(id, page) {
             fetch('get_donasi_admin.php?id=' + id)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         let d = data.data;
                         document.getElementById('verifikasi_id').value = d.id;
+                        document.getElementById('verifikasi_page').value = page;
                         document.getElementById('verifikasiData').innerHTML = `
                             <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.nama_lengkap}</div></div>
                             <div class="detail-item"><div class="detail-label">Tanggal</div><div class="detail-value">${d.tanggal_donasi}</div></div>
@@ -504,19 +544,24 @@ unset($_SESSION['success'], $_SESSION['error']);
                 });
         }
         
-        function openEditVerifikasiModal(id, currentStatus) {
+        function openEditVerifikasiModal(id, currentStatus, page) {
             fetch('get_donasi_admin.php?id=' + id)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         let d = data.data;
                         document.getElementById('edit_verifikasi_id').value = d.id;
+                        document.getElementById('edit_verifikasi_page').value = page;
+                        
+                        let catatanHtml = d.catatan_verifikasi ? d.catatan_verifikasi : '';
+                        
                         document.getElementById('editVerifikasiData').innerHTML = `
                             <div class="detail-item"><div class="detail-label">Donatur</div><div class="detail-value">${d.nama_lengkap}</div></div>
                             <div class="detail-item"><div class="detail-label">Tanggal</div><div class="detail-value">${d.tanggal_donasi}</div></div>
                             <div class="detail-item"><div class="detail-label">Kategori</div><div class="detail-value">${d.nama_kategori}</div></div>
                             <div class="detail-item"><div class="detail-label">Nominal</div><div class="detail-value">Rp ${new Intl.NumberFormat('id-ID').format(d.nominal)}</div></div>
                             <div class="detail-item"><div class="detail-label">Status Saat Ini</div><div class="detail-value"><span class="status-badge ${currentStatus == 'success' ? 'status-success' : 'status-failed'}">${currentStatus == 'success' ? 'Sukses' : 'Tidak Valid'}</span></div></div>
+                            ${d.catatan_verifikasi ? `<div class="detail-item"><div class="detail-label">Catatan Sebelumnya</div><div class="detail-value">${d.catatan_verifikasi}</div></div>` : ''}
                         `;
                         
                         // Set radio button sesuai status saat ini
@@ -525,6 +570,9 @@ unset($_SESSION['success'], $_SESSION['error']);
                         } else {
                             document.getElementById('edit_status_failed').checked = true;
                         }
+                        
+                        // Set catatan
+                        document.getElementById('edit_catatan_verifikasi').value = catatanHtml;
                         
                         document.getElementById('editVerifikasiModal').classList.add('show');
                     }

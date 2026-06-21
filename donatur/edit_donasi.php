@@ -1,12 +1,12 @@
 <?php
 // ======================================================
-// FILE: edit_donasi.php
+// FILE: donatur/edit_donasi.php
 // HALAMAN EDIT DONASI BIASA UNTUK DONATUR
 // ======================================================
 
-require_once 'config/database.php';
-require_once 'config/session.php';
-require_once 'config/rbac.php';
+require_once '../config/database.php';
+require_once '../config/session.php';
+require_once '../config/rbac.php';
 
 requireRole('donatur');
 
@@ -24,7 +24,7 @@ $sql = "SELECT d.*, k.nama_kategori
 $donasi = query($sql);
 
 if (count($donasi) == 0) {
-    header('Location: donatur/histori.php');
+    header('Location: histori.php');
     exit();
 }
 $donasi = $donasi[0];
@@ -32,7 +32,7 @@ $donasi = $donasi[0];
 // Cek status (hanya pending/failed yang bisa diedit)
 if (!in_array($donasi['status'], ['pending', 'failed'])) {
     $_SESSION['error'] = "Donasi yang sudah sukses tidak bisa diedit!";
-    header('Location: donatur/histori.php');
+    header('Location: histori.php');
     exit();
 }
 
@@ -52,11 +52,11 @@ function uploadBukti($existing_file = null) {
         }
         
         $filename = 'donasi_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
-        $target = 'assets/uploads/bukti_transfer/' . $filename;
+        $target = '../assets/uploads/bukti_transfer/' . $filename;
         
         if (move_uploaded_file($_FILES['bukti_transfer']['tmp_name'], $target)) {
-            if ($existing_file && file_exists('assets/uploads/bukti_transfer/' . $existing_file)) {
-                unlink('assets/uploads/bukti_transfer/' . $existing_file);
+            if ($existing_file && file_exists('../assets/uploads/bukti_transfer/' . $existing_file)) {
+                unlink('../assets/uploads/bukti_transfer/' . $existing_file);
             }
             return ['success' => true, 'filename' => $filename];
         }
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mysqli_query($conn, $sql_update)) {
         logActivity($currentUser['id'], "Mengedit donasi biasa ID: $id");
         $_SESSION['success'] = "Donasi berhasil diupdate!";
-        header('Location: donatur/histori.php');
+        header('Location: histori.php');
         exit();
     } else {
         $error = "Gagal mengupdate: " . mysqli_error($conn);
@@ -334,17 +334,18 @@ unset($_SESSION['success']);
     <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <img src="assets/image/almuthi.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
+            <img src="../assets/image/almuthi.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
             <div><h3>Panti Asuhan</h3><p>Al-Muthi</p></div>
         </div>
-        <div class="sidebar-menu">
-            <div class="menu-item" onclick="location.href='donatur/dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Beranda</span></div>
-            <div class="menu-item" onclick="location.href='donatur/donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
-            <div class="menu-item active" onclick="location.href='donatur/histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
-            <div class="menu-item" onclick="location.href='donatur/laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Laporan Pengeluaran</span></div>
-            <div class="menu-item" onclick="location.href='donatur/doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
-            <div class="menu-item" onclick="location.href='donatur/perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
-            <div class="menu-item" onclick="location.href='donatur/laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan</span></div>
+         <div class="sidebar-menu">
+            <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
+            <div class="menu-item" onclick="location.href='donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
+            <div class="menu-item" onclick="location.href='../semua_program.php'"><i class="fas fa-chalkboard-user"></i><span>Program Utama</span></div>
+            <div class="menu-item active" onclick="location.href='histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
+            <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
+            <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khusus Do'a</span></div>
+            <div class="menu-item" onclick="location.href='perkembangan.php'"><i class="fas fa-seedling"></i><span>Perkembangan Anak</span></div>
+            <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
         </div>
     </div>
     
@@ -354,7 +355,7 @@ unset($_SESSION['success']);
             <div class="profile-dropdown">
                 <div class="profile-icon"><i class="fas fa-cog"></i></div>
                 <div class="dropdown-menu">
-                    <a href="donatur/profil.php"><i class="fas fa-user-circle"></i> Profil</a>
+                    <a href="profil.php"><i class="fas fa-user-circle"></i> Profil</a>
                     <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
             </div>
@@ -427,12 +428,12 @@ unset($_SESSION['success']);
                 <?php if ($donasi['bukti_transfer']): ?>
                 <div class="current-image">
                     <label style="font-size:12px; color:#888;">Bukti Transfer Saat Ini</label><br>
-                    <img src="assets/uploads/bukti_transfer/<?php echo $donasi['bukti_transfer']; ?>" onclick="window.open(this.src)">
+                    <img src="../assets/uploads/bukti_transfer/<?php echo $donasi['bukti_transfer']; ?>" onclick="window.open(this.src)">
                 </div>
                 <?php endif; ?>
                 
                 <div class="btn-group">
-                    <a href="donatur/histori.php" class="btn-cancel"><i class="fas fa-times"></i> Batal</a>
+                    <a href="histori.php" class="btn-cancel"><i class="fas fa-times"></i> Batal</a>
                     <button type="submit" class="btn-save"><i class="fas fa-save"></i> Simpan</button>
                 </div>
             </form>

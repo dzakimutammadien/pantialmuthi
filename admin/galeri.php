@@ -171,7 +171,15 @@ unset($_SESSION['success'], $_SESSION['error']);
         .submenu-item:hover { color: #50c878; padding-left: 25px; }
         .menu-item.has-submenu .arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
         .menu-item.has-submenu.open .arrow { transform: rotate(180deg); }
-        
+        .badge-pending {
+    background: #f44336;
+    color: white;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    margin-left: auto;
+        }
+
         .main-content { margin-left: 280px; padding: 20px; min-height: 100vh; }
         
         .topbar { background: white; border-radius: 15px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
@@ -266,6 +274,16 @@ unset($_SESSION['success'], $_SESSION['error']);
         <i class="fas fa-pray"></i>
         <span>Data Doa Khusus</span>
     </div>
+</div>
+ <div class="menu-item" onclick="location.href='verifikasi_pendaftaran.php'">
+    <i class="fas fa-user-check"></i>
+    <span>Verifikasi Akun</span>
+    <?php 
+    $pending_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM pendaftaran WHERE status = 'pending'"))['total'];
+    if ($pending_count > 0): 
+    ?>
+        <span class="badge-pending"><?php echo $pending_count; ?></span>
+    <?php endif; ?>
 </div>
         </div>
     </div>
