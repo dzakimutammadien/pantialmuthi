@@ -2,6 +2,7 @@
 // ======================================================
 // FILE: donatur/donasi.php
 // HALAMAN DONASI UNTUK DONATUR
+// DENGAN MODE TEST (TANGGAL BISA DIUBAH)
 // ======================================================
 
 require_once '../config/database.php';
@@ -11,6 +12,11 @@ require_once '../config/rbac.php';
 requireRole('donatur');
 
 $currentUser = getCurrentUser();
+
+// ======================================================
+// CEK MODE TEST (untuk kuisioner/demo)
+// ======================================================
+$mode_test = isset($_GET['mode']) && $_GET['mode'] == 'test';
 
 // Generate ID Donasi unik
 $id_donasi = 'DON-' . date('Ymd') . '-' . rand(1000, 9999);
@@ -45,13 +51,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['donasi'])) {
         }
     }
     
-    $sql = "INSERT INTO donasi (user_id, kategori_id, nominal, bukti_transfer, catatan_doa, keterangan, status) 
-            VALUES ($user_id, $kategori_id, $nominal, '$bukti_transfer', '$catatan_doa', '$keterangan', 'pending')";
+    // ======================================================
+    // TANGGAL DONASI: Mode Test atau Otomatis
+    // ======================================================
+    if ($mode_test && !empty($_POST['tanggal_donasi'])) {
+        // Mode test: tanggal dari input form (bisa diubah)
+        $tanggal_donasi = mysqli_real_escape_string($conn, $_POST['tanggal_donasi']);
+        $tanggal_donasi = date('Y-m-d H:i:s', strtotime($tanggal_donasi));
+    } else {
+        // Mode normal: tanggal otomatis (sekarang)
+        $tanggal_donasi = date('Y-m-d H:i:s');
+    }
+    
+    $sql = "INSERT INTO donasi (user_id, kategori_id, nominal, bukti_transfer, catatan_doa, keterangan, status, tanggal_donasi) 
+            VALUES ($user_id, $kategori_id, $nominal, '$bukti_transfer', '$catatan_doa', '$keterangan', 'pending', '$tanggal_donasi')";
     
     if (mysqli_query($conn, $sql)) {
         logActivity($currentUser['id'], "Melakukan donasi Rp " . number_format($nominal));
         $_SESSION['success'] = "Donasi berhasil dikirim! Menunggu verifikasi admin.";
-        header("Location: donasi.php");
+        header("Location: donasi.php" . ($mode_test ? "?mode=test" : ""));
         exit();
     } else {
         $error = "Gagal melakukan donasi: " . mysqli_error($conn);
@@ -245,6 +263,29 @@ unset($_SESSION['success']);
             border-left: 4px solid #f44336;
         }
         
+        /* Mode Test Notice */
+        .mode-test-notice {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+            border-radius: 10px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            color: #e65100;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .mode-test-notice i {
+            font-size: 20px;
+        }
+        
+        .mode-test-notice a {
+            color: #e65100;
+            font-weight: 600;
+        }
+        
         @media (max-width: 768px) {
             .sidebar { left: -280px; }
             .main-content { margin-left: 0; }
@@ -263,18 +304,17 @@ unset($_SESSION['success']);
             <div class="menu-item" onclick="location.href='dashboard.php'"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
             <div class="menu-item active" onclick="location.href='donasi.php'"><i class="fas fa-hand-holding-heart"></i><span>Donasi Sekarang</span></div>
             <div class="menu-item" onclick="location.href='../semua_program.php'">
-        <i class="fas fa-chalkboard-user"></i>
-        <span>Program Utama</span>
-    </div>
+                <i class="fas fa-chalkboard-user"></i>
+                <span>Program Utama</span>
+            </div>
             <div class="menu-item" onclick="location.href='histori.php'"><i class="fas fa-history"></i><span>Riwayat Donasi</span></div>
             <div class="menu-item" onclick="location.href='laporan_pengeluaran.php'"><i class="fas fa-money-bill-wave"></i><span>Pengeluaran Panti</span></div>
             <div class="menu-item" onclick="location.href='doa_saya.php'"><i class="fas fa-pray"></i><span>Laporan Khususon Do'a</span></div>
-                     
-                    <div class="menu-item" onclick="location.href='perkembangan.php'">
-    <i class="fas fa-seedling"></i>
-    <span>Perkembangan Anak</span>
-</div>
- <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
+            <div class="menu-item" onclick="location.href='perkembangan.php'">
+                <i class="fas fa-seedling"></i>
+                <span>Perkembangan Anak</span>
+            </div>
+            <div class="menu-item" onclick="location.href='laporan.php'"><i class="fas fa-chart-line"></i><span>Laporan Keuangan</span></div>
         </div>
     </div>
     
@@ -293,6 +333,16 @@ unset($_SESSION['success']);
                 </div>
             </div>
         </div>
+        
+        <?php if ($mode_test): ?>
+        <div class="mode-test-notice">
+            <i class="fas fa-flask"></i>
+            <div>
+                <strong>🔬 Mode Testing Aktif!</strong> Tanggal donasi bisa diubah sesuai keinginan.
+                <br><small>Klik <a href="donasi.php">di sini</a> untuk kembali ke mode normal.</small>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo $success; ?></div>
@@ -331,7 +381,15 @@ unset($_SESSION['success']);
                         </div>
                         <div class="form-group">
                             <label>Tanggal Donasi</label>
-                            <input type="text" value="<?php echo date('d/m/Y'); ?>" disabled style="background:#f5f5f5;">
+                            <?php if ($mode_test): ?>
+                                <!-- Mode Test: Tanggal bisa diubah MANUAL -->
+                                <input type="datetime-local" name="tanggal_donasi" value="<?php echo date('Y-m-d\TH:i'); ?>" required>
+                                <small style="color:#ff9800;"><i class="fas fa-info-circle"></i> Mode Test: Tanggal bisa diubah sesuai keinginan</small>
+                            <?php else: ?>
+                                <!-- Mode Normal: Tanggal OTOMATIS -->
+                                <input type="text" value="<?php echo date('d/m/Y H:i'); ?>" disabled style="background:#f5f5f5;">
+                                <small style="color:#888;"></small>
+                            <?php endif; ?>
                         </div>
                     </div>
                     

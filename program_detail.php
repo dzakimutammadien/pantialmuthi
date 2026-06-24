@@ -4,10 +4,16 @@
 // HALAMAN DETAIL PROGRAM + FORM DONASI
 // DENGAN 2 TAMPILAN: PUBLIK (BG HIJAU) & DONATUR LOGIN (SIDEBAR)
 // PERBAIKAN: No WhatsApp untuk donatur login READONLY
+// TAMBAHAN: Mode Test untuk tanggal donasi program
 // ======================================================
 
 require_once 'config/database.php';
 require_once 'config/session.php';
+
+// ======================================================
+// CEK MODE TEST (untuk kuisioner/demo)
+// ======================================================
+$mode_test = isset($_GET['mode']) && $_GET['mode'] == 'test';
 
 // Cek apakah user login sebagai donatur
 $is_donatur_login = false;
@@ -47,8 +53,7 @@ $total_tersalurkan = mysqli_fetch_assoc($result_tersalurkan)['total'] ?? 0;
 // Proses Donasi Program - PERBAIKAN
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['donasi_program'])) {
     $nama_donatur = mysqli_real_escape_string($conn, $_POST['nama_donatur']);
-    // SETELAH PERBAIKAN
-$no_whatsapp = isset($_POST['no_whatsapp']) ? mysqli_real_escape_string($conn, $_POST['no_whatsapp']) : '';
+    $no_whatsapp = isset($_POST['no_whatsapp']) ? mysqli_real_escape_string($conn, $_POST['no_whatsapp']) : '';
     $is_anonim = isset($_POST['is_anonim']) ? (int)$_POST['is_anonim'] : 0;
     $nominal = (float)$_POST['nominal'];
     $pesan = mysqli_real_escape_string($conn, $_POST['pesan']);
@@ -76,12 +81,24 @@ $no_whatsapp = isset($_POST['no_whatsapp']) ? mysqli_real_escape_string($conn, $
         
         $nama_donatur_final = ($is_anonim == 1) ? 'Hamba Allah' : ($nama_donatur ?: 'Hamba Allah');
         
+        // ======================================================
+        // TANGGAL DONASI: Mode Test atau Otomatis
+        // ======================================================
+        if ($mode_test && !empty($_POST['tanggal_donasi'])) {
+            // Mode test: tanggal dari input form (bisa diubah)
+            $tanggal_donasi = mysqli_real_escape_string($conn, $_POST['tanggal_donasi']);
+            $tanggal_donasi = date('Y-m-d H:i:s', strtotime($tanggal_donasi));
+        } else {
+            // Mode normal: tanggal otomatis (sekarang)
+            $tanggal_donasi = date('Y-m-d H:i:s');
+        }
+        
         // Jika user login
         if ($is_donatur_login) {
             $user_id = $_SESSION['user_id'];
             
-            $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
-                    VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
+            $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status, created_at) 
+                    VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending', '$tanggal_donasi')";
             
         } else {
             // ======================================================
@@ -109,8 +126,8 @@ $no_whatsapp = isset($_POST['no_whatsapp']) ? mysqli_real_escape_string($conn, $
             // ======================================================
             // SIMPAN DONASI PROGRAM
             // ======================================================
-            $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status) 
-                    VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending')";
+            $sql = "INSERT INTO donasi_program (program_id, user_id, nama_donatur, is_anonim, nominal, pesan, bukti_transfer, status, created_at) 
+                    VALUES ($program_id, $user_id, '$nama_donatur_final', $is_anonim, $nominal, '$pesan', '$bukti_transfer', 'pending', '$tanggal_donasi')";
         }
         
         if (mysqli_query($conn, $sql)) {
@@ -257,6 +274,27 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
             }
            .btn-back { background: #6c757d; color: white; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
             
+            /* Mode Test Notice */
+            .mode-test-notice {
+                background: #fff3e0;
+                border: 2px solid #ff9800;
+                border-radius: 10px;
+                padding: 12px 20px;
+                margin-bottom: 20px;
+                color: #e65100;
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .mode-test-notice i {
+                font-size: 20px;
+            }
+            .mode-test-notice a {
+                color: #e65100;
+                font-weight: 600;
+            }
+            
             @media (max-width: 768px) { 
                 .sidebar { left: -280px; } 
                 .main-content-donatur { margin-left: 0; } 
@@ -301,6 +339,16 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
             </div>
             
             <div class="container-donatur">
+                <?php if ($mode_test): ?>
+                <div class="mode-test-notice">
+                    <i class="fas fa-flask"></i>
+                    <div>
+                        <strong>🔬 Mode Testing Aktif!</strong> Tanggal donasi bisa diubah sesuai keinginan.
+                        <br><small>Klik <a href="program_detail.php?id=<?php echo $program_id; ?>">di sini</a> untuk kembali ke mode normal.</small>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
                 <!-- PROGRAM HEADER -->
                 <div class="program-header">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 10px;">
@@ -363,6 +411,22 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                                     <small style="color:#888;">Nomor WhatsApp yang terdaftar di akun Anda</small>
                                 </div>
                                 <input type="hidden" name="no_whatsapp" value="<?php echo htmlspecialchars($currentUser['no_whatsapp'] ?? ''); ?>">
+                                
+                                <!-- ====================================================== -->
+                                <!-- TANGGAL DONASI: Mode Test atau Otomatis               -->
+                                <!-- ====================================================== -->
+                                <div class="form-group">
+                                    <label>Tanggal Donasi</label>
+                                    <?php if ($mode_test): ?>
+                                        <!-- Mode Test: Tanggal bisa diubah MANUAL -->
+                                        <input type="datetime-local" name="tanggal_donasi" value="<?php echo date('Y-m-d\TH:i'); ?>" required>
+                                        <small style="color:#ff9800;"><i class="fas fa-info-circle"></i> Mode Test: Tanggal bisa diubah sesuai keinginan</small>
+                                    <?php else: ?>
+                                        <!-- Mode Normal: Tanggal OTOMATIS -->
+                                        <input type="text" value="<?php echo date('d/m/Y H:i'); ?>" disabled style="background:#f5f5f5;">
+                                        <small style="color:#888;"></small>
+                                    <?php endif; ?>
+                                </div>
                                 
                                 <div class="form-group">
                                     <label>Pesan (Opsional)</label>
@@ -584,12 +648,44 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                 background: #50c878;
                 color: white;
             }
+            
+            /* Mode Test Notice */
+            .mode-test-notice {
+                background: #fff3e0;
+                border: 2px solid #ff9800;
+                border-radius: 10px;
+                padding: 12px 20px;
+                margin-bottom: 20px;
+                color: #e65100;
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .mode-test-notice i {
+                font-size: 20px;
+            }
+            .mode-test-notice a {
+                color: #e65100;
+                font-weight: 600;
+            }
+            
             @media (max-width: 768px) { .main-content { flex-direction: column; } .program-stats { grid-template-columns: 1fr; } }
         </style>
     </head>
     <body>
     <div class="container">
         <a href="semua_program.php" class="btn-back"><i class="fas fa-arrow-left"></i> Kembali</a>
+        
+        <?php if ($mode_test): ?>
+        <div class="mode-test-notice">
+            <i class="fas fa-flask"></i>
+            <div>
+                <strong>🔬 Mode Testing Aktif!</strong> Tanggal donasi bisa diubah sesuai keinginan.
+                <br><small>Klik <a href="program_detail.php?id=<?php echo $program_id; ?>">di sini</a> untuk kembali ke mode normal.</small>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <div class="program-header">
             <h1 class="program-title"><?php echo $program['nama_program']; ?></h1>
@@ -646,6 +742,22 @@ $total_galeri = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
                         <div class="form-group" id="nama_field">
                             <label>Nama (jika ditampilkan)</label>
                             <input type="text" name="nama_donatur" placeholder="Masukkan nama Anda">
+                        </div>
+                        
+                        <!-- ====================================================== -->
+                        <!-- TANGGAL DONASI: Mode Test atau Otomatis               -->
+                        <!-- ====================================================== -->
+                        <div class="form-group">
+                            <label>Tanggal Donasi</label>
+                            <?php if ($mode_test): ?>
+                                <!-- Mode Test: Tanggal bisa diubah MANUAL -->
+                                <input type="datetime-local" name="tanggal_donasi" value="<?php echo date('Y-m-d\TH:i'); ?>" required>
+                                <small style="color:#ff9800;"><i class="fas fa-info-circle"></i> Mode Test: Tanggal bisa diubah sesuai keinginan</small>
+                            <?php else: ?>
+                                <!-- Mode Normal: Tanggal OTOMATIS -->
+                                <input type="text" value="<?php echo date('d/m/Y H:i'); ?>" disabled style="background:#f5f5f5;">
+                                <small style="color:#888;"></small>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="form-group">
