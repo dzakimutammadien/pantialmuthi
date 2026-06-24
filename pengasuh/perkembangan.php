@@ -446,7 +446,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <!-- RIWAYAT DATA KESEHATAN -->
             <div class="riwayat-table">
                 <h4><i class="fas fa-history"></i> Riwayat Kesehatan</h4>
-                <table>
+            <table>
                     <thead>
                         <tr><th>Tanggal</th><th>Berat (kg)</th><th>Tinggi (cm)</th><th>Keterangan</th><th>Aksi</th></tr>
                     </thead>

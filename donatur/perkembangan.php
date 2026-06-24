@@ -205,7 +205,7 @@ if ($selected_anak > 0) {
             <!-- RIWAYAT DATA KESEHATAN -->
             <div class="riwayat-table">
                 <h4><i class="fas fa-history"></i> Riwayat Kesehatan</h4>
-                <tr>
+                <table>
                     <thead>
                         <tr><th>Tanggal</th><th>Berat (kg)</th><th>Tinggi (cm)</th><th>Keterangan</th></tr>
                     </thead>
